@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+}
+
+html, body { -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #ede9fe 0%, transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, #fce7f3 0%, transparent 55%),
+    radial-gradient(900px 600px at 50% 110%, #dbeafe 0%, transparent 60%),
+    #f4f5fb;
+  color: #0f172a;
+  min-height: 100vh;
+}
+
+.font-display { font-family: var(--font-display); }
+
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -16px rgba(15, 23, 42, 0.18);
+}
+
+.card-hover { transition: transform .15s ease, box-shadow .15s ease; }
+.card-hover:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(15,23,42,.06), 0 18px 40px -18px rgba(99,102,241,.35); }
+
+.input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.9rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.95rem;
+  outline: none;
+}
+.input:focus { border-color: #818cf8; box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.18); }
+
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed 55%, #db2777);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 0.9rem;
+  transition: filter .15s ease, transform .1s ease;
+}
+.btn-primary:hover { filter: brightness(1.05); }
+.btn-primary:active { transform: scale(0.99); }
+
+.pill { border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; }
+.pill-active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+.nice-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+.nice-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.nice-scroll::-webkit-scrollbar-track { background: transparent; }
+
+.detail-table { width: 100%; font-size: 0.8rem; }
+.detail-table dt { color: #64748b; }
+.detail-table dd { color: #0f172a; font-weight: 600; text-align: right; }

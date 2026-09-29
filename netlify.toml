@@ -1,0 +1,4 @@
+# Netlify auto-deploy settings (used when connected to GitHub)
+[build]
+  command = "npm run build"
+  publish = "dist"
