@@ -34,12 +34,21 @@ export function defaultCategories(userId) {
   ];
 }
 
+export function defaultTrackers(userId) {
+  return [
+    { id: uid(), user_id: userId, name: 'Gym', icon: '🏋️', color: '#10b981', unit: 'workouts', target_per_week: 4, sort_order: 0, created_at: now() },
+    { id: uid(), user_id: userId, name: 'Reading', icon: '📖', color: '#8b5cf6', unit: 'pages', target_per_week: 100, sort_order: 1, created_at: now() },
+  ];
+}
+
 const seed = () => ({
   user: { id: LOCAL_USER_ID, email: null, created_at: now() },
   settings: { appTitle: 'Tick It Off ✅', tagline: 'Small steps every day. 🌱' },
   categories: defaultCategories(LOCAL_USER_ID),
   items: [],
   subitems: [],
+  trackers: defaultTrackers(LOCAL_USER_ID),
+  tracker_logs: [],
 });
 
 function migrate(raw) {
@@ -52,6 +61,8 @@ function migrate(raw) {
   if (!Array.isArray(d.categories)) d.categories = [];
   if (!Array.isArray(d.items)) d.items = [];
   if (!Array.isArray(d.subitems)) d.subitems = [];
+  if (!Array.isArray(d.trackers)) d.trackers = [];
+  if (!Array.isArray(d.tracker_logs)) d.tracker_logs = [];
   // Archive defaults for items created before archiving existed
   d.items.forEach((i) => {
     if (i.is_archived === undefined) i.is_archived = false;
@@ -109,7 +120,19 @@ export function normalizeForCloud(data, userId) {
     id: UUID_RE.test(s.id || '') ? s.id : uid(),
     item_id: itemMap[s.item_id] ?? s.item_id,
   }));
-  return { ...data, categories, items, subitems };
+  const trackerMap = {};
+  const trackers = (data.trackers || []).map((t) => {
+    const id = UUID_RE.test(t.id || '') ? t.id : uid();
+    trackerMap[t.id] = id;
+    return { ...t, id, user_id: userId };
+  });
+  const tracker_logs = (data.tracker_logs || []).map((l) => ({
+    ...l,
+    id: UUID_RE.test(l.id || '') ? l.id : uid(),
+    user_id: userId,
+    tracker_id: trackerMap[l.tracker_id] ?? l.tracker_id,
+  }));
+  return { ...data, categories, items, subitems, trackers, tracker_logs };
 }
 
 function throwIf(error, where) {
@@ -131,7 +154,17 @@ export async function pullCloud(userId) {
     throwIf(e3, 'load checklist');
     subitems = subs || [];
   }
-  return { categories: categories || [], items: items || [], subitems };
+  const { data: trackers, error: e4 } = await supabase
+    .from('trackers').select('*').eq('user_id', userId).order('sort_order');
+  throwIf(e4, 'load trackers');
+  let tracker_logs = [];
+  if (trackers && trackers.length) {
+    const { data: tl, error: e5 } = await supabase
+      .from('tracker_logs').select('*').in('tracker_id', trackers.map((t) => t.id));
+    throwIf(e5, 'load activity');
+    tracker_logs = tl || [];
+  }
+  return { categories: categories || [], items: items || [], subitems, trackers: trackers || [], tracker_logs };
 }
 
 // Upload full state (upsert all rows) + delete cloud rows missing locally.
@@ -151,6 +184,15 @@ export async function pushCloud(userId, data) {
     id: s.id, item_id: s.item_id, text: s.text, is_done: !!s.is_done,
     created_at: s.created_at, updated_at: s.updated_at,
   }));
+  const dbTrackers = (data.trackers || []).map((t) => ({
+    id: t.id, user_id: userId, name: t.name, icon: t.icon, color: t.color,
+    unit: t.unit ?? 'times', target_per_week: t.target_per_week ?? null,
+    sort_order: t.sort_order, created_at: t.created_at,
+  }));
+  const dbLogs = (data.tracker_logs || []).map((l) => ({
+    id: l.id, tracker_id: l.tracker_id, user_id: userId, log_date: l.log_date,
+    value: Number(l.value) || 0, note: l.note ?? '', created_at: l.created_at,
+  }));
 
   if (dbCats.length) {
     const { error } = await supabase.from('categories').upsert(dbCats);
@@ -163,6 +205,14 @@ export async function pushCloud(userId, data) {
   if (dbSubs.length) {
     const { error } = await supabase.from('checklist_subitems').upsert(dbSubs);
     throwIf(error, 'save checklist');
+  }
+  if (dbTrackers.length) {
+    const { error } = await supabase.from('trackers').upsert(dbTrackers);
+    throwIf(error, 'save trackers');
+  }
+  if (dbLogs.length) {
+    const { error } = await supabase.from('tracker_logs').upsert(dbLogs);
+    throwIf(error, 'save activity');
   }
 
   // Delete cloud orphans (rows the user removed on this device).
@@ -193,6 +243,26 @@ export async function pushCloud(userId, data) {
       throwIf(error, 'delete checklist');
     }
   }
+  // Tracker orphans (logs first, then trackers)
+  const { data: rt, error: re4 } = await supabase.from('trackers').select('id').eq('user_id', userId);
+  throwIf(re4, 'check trackers');
+  const keepTrackers = new Set((data.trackers || []).map((t) => t.id));
+  const delTrackers = (rt || []).map((r) => r.id).filter((id) => !keepTrackers.has(id));
+  if (delTrackers.length) {
+    const { error } = await supabase.from('trackers').delete().in('id', delTrackers);
+    throwIf(error, 'delete trackers');
+  }
+  if (rt && rt.length) {
+    const { data: rl, error: re5 } = await supabase
+      .from('tracker_logs').select('id').in('tracker_id', rt.map((r) => r.id));
+    throwIf(re5, 'check activity');
+    const keepLogs = new Set((data.tracker_logs || []).map((l) => l.id));
+    const delLogs = (rl || []).map((r) => r.id).filter((id) => !keepLogs.has(id));
+    if (delLogs.length) {
+      const { error } = await supabase.from('tracker_logs').delete().in('id', delLogs);
+      throwIf(error, 'delete activity');
+    }
+  }
 }
 
 // Make sure a profile row exists for FK references (best-effort; a DB trigger
@@ -206,7 +276,8 @@ export async function upsertProfile(user) {
 }
 
 const hasContent = (d) =>
-  !!d && ((d.categories && d.categories.length > 0) || (d.items && d.items.length > 0));
+  !!d && ((d.categories && d.categories.length > 0) || (d.items && d.items.length > 0) ||
+    (d.trackers && d.trackers.length > 0) || (d.tracker_logs && d.tracker_logs.length > 0));
 
 // Cloud store: same [data, setData] interface as useStore, so the whole UI
 // works unchanged. Pulls on login, pushes (debounced) on every change.
@@ -241,7 +312,7 @@ export function useCloudStore(session, getLocal) {
       setSync({ state: 'loading', at: null, error: '' });
       try {
         const cloud = await pullCloud(userId);
-        const cloudEmpty = cloud.categories.length === 0 && cloud.items.length === 0;
+        const cloudEmpty = cloud.categories.length === 0 && cloud.items.length === 0 && (cloud.trackers || []).length === 0;
         const local = localRef.current;
         if (cloudEmpty && hasContent(local)) {
           // First login: move this device's entries up to the cloud
@@ -277,6 +348,8 @@ export function useCloudStore(session, getLocal) {
             categories: defaultCategories(userId),
             items: [],
             subitems: [],
+            trackers: defaultTrackers(userId),
+            tracker_logs: [],
           };
           await pushCloud(userId, fresh);
           if (!cancelled) {

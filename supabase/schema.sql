@@ -70,3 +70,43 @@ create index if not exists idx_subs_item on checklist_subitems(item_id);
 alter table items add column if not exists is_archived boolean default false;
 alter table items add column if not exists archived_at timestamptz;
 create index if not exists idx_items_archived on items(user_id, is_archived);
+
+-- Growth / activity tracker (habits like gym, reading a specific book)
+create table if not exists trackers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  name text not null,
+  icon text,
+  color text,
+  unit text default 'times',
+  target_per_week int,
+  sort_order int default 0,
+  created_at timestamptz default now()
+);
+
+create table if not exists tracker_logs (
+  id uuid primary key default gen_random_uuid(),
+  tracker_id uuid references trackers(id) on delete cascade not null,
+  user_id uuid references users(id) on delete cascade not null,
+  log_date date not null default CURRENT_DATE,
+  value numeric default 1,
+  note text default '',
+  created_at timestamptz default now()
+);
+
+alter table trackers enable row level security;
+alter table tracker_logs enable row level security;
+
+drop policy if exists "own trackers" on trackers;
+create policy "own trackers" on trackers
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own tracker logs" on tracker_logs;
+create policy "own tracker logs" on tracker_logs
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists idx_trackers_user on trackers(user_id, sort_order);
+create index if not exists idx_tlogs_tracker on tracker_logs(tracker_id, log_date desc);
+
+grant all on public.trackers to authenticated;
+grant all on public.tracker_logs to authenticated;

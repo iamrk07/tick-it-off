@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore, useCloudStore, uid, now, LOCAL_USER_ID } from './lib/store.js';
 import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
+import Growth from './components/Growth.jsx';
 import { toJSON, toCSV } from './lib/export.js';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
@@ -28,7 +29,7 @@ function emptyItem(catId) {
   return { category_id: catId ?? '', title: '', notes: '', link: '', is_checklist: false, subs: [''] };
 }
 // Placeholder while cloud data loads (replaced before anything renders)
-const EMPTY = { user: null, settings: { appTitle: 'Tick It Off ✅', tagline: '' }, categories: [], items: [], subitems: [] };
+const EMPTY = { user: null, settings: { appTitle: 'Tick It Off ✅', tagline: '' }, categories: [], items: [], subitems: [], trackers: [], tracker_logs: [] };
 const asLink = (l) => (/^https?:\/\//i.test(l) ? l : `https://${l}`);
 
 // A fresh line of fuel under the title — rotates daily
@@ -67,6 +68,8 @@ export default function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [mobileTab, setMobileTab] = useState('items'); // cats | items | details
+  const [view, setView] = useState('plan'); // plan | growth
+  const [gtab, setGtab] = useState('trackers'); // trackers | progress (mobile panes in growth view)
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [form, setForm] = useState(emptyItem(data.categories[0]?.id));
@@ -363,11 +366,23 @@ export default function App() {
                 </div>
               )}
               <p className="text-white/80 text-xs sm:text-sm mt-0.5 italic">“{todayQuote()}”</p>
-              <div className="flex gap-2 mt-1 text-[11px]">
-                <span className="bg-white/15 rounded-full px-2.5 py-0.5">🔥 {activeCount} active</span>
-                <span className="bg-white/15 rounded-full px-2.5 py-0.5">✅ {doneCount} done</span>
-                <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline">📁 {cats.length} categories</span>
-                {archivedCount > 0 && <span className="bg-white/15 rounded-full px-2.5 py-0.5">📦 {archivedCount} archived</span>}
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex gap-1 text-[11px] font-bold bg-white/15 rounded-full p-1 shrink-0">
+                  <button onClick={() => setView('plan')} className={`px-3 py-1 rounded-full transition ${view === 'plan' ? 'bg-slate-900 text-white shadow' : 'text-white/85 hover:text-white'}`}>🗂️ Planner</button>
+                  <button onClick={() => setView('growth')} className={`px-3 py-1 rounded-full transition ${view === 'growth' ? 'bg-slate-900 text-white shadow' : 'text-white/85 hover:text-white'}`}>📈 Growth</button>
+                </div>
+                {view === 'plan' ? (
+                  <div className="flex gap-2 text-[11px] overflow-x-auto nice-scroll">
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">🔥 {activeCount} active</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">✅ {doneCount} done</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline whitespace-nowrap">📁 {cats.length} categories</span>
+                    {archivedCount > 0 && <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📦 {archivedCount} archived</span>}
+                  </div>
+                ) : (
+                  <div className="flex gap-2 text-[11px]">
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {(data.trackers || []).length} trackers</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0 items-end">
@@ -392,7 +407,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* ===== 3-pane layout ===== */}
+      {/* ===== 3-pane layout (planner) / Growth view ===== */}
+      {view === 'plan' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 grid gap-4 lg:grid-cols-[290px_minmax(0,1fr)_380px] items-start pb-28 lg:pb-10">
 
         {/* LEFT: categories */}
@@ -592,6 +608,11 @@ export default function App() {
 
         </aside>
       </div>
+      ) : (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
+        <Growth data={data} setData={setData} gtab={gtab} setGtab={setGtab} />
+      </div>
+      )}
 
       {/* ===== Popup entry form (modal) ===== */}
       {showModal && (
@@ -681,15 +702,27 @@ export default function App() {
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-3 gap-2 text-xs font-bold">
-        {[['cats', '📁 Categories'], ['items', '🗂️ Entries'], ['details', '✨ Details']].map(([k, label]) => (
-          <button key={k} onClick={() => setMobileTab(k)}
-            className={`py-2.5 rounded-xl ${mobileTab === k ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-            {label}
+        {(view === 'plan'
+          ? [
+              { k: 'cats', label: '📁 Categories', fn: () => setMobileTab('cats'), active: mobileTab === 'cats' },
+              { k: 'items', label: '🗂️ Entries', fn: () => setMobileTab('items'), active: mobileTab === 'items' },
+              { k: 'details', label: '✨ Details', fn: () => setMobileTab('details'), active: mobileTab === 'details' },
+            ]
+          : [
+              { k: 'trackers', label: '📈 Trackers', fn: () => setGtab('trackers'), active: gtab === 'trackers' },
+              { k: 'progress', label: '✅ Progress', fn: () => setGtab('progress'), active: gtab === 'progress' },
+              { k: 'plan', label: '🗂️ Planner', fn: () => setView('plan'), active: false },
+            ]
+        ).map((b) => (
+          <button key={b.k} onClick={b.fn}
+            className={`py-2.5 rounded-xl ${b.active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
+            {b.label}
           </button>
         ))}
       </nav>
 
-      {/* Floating + button on mobile */}
+      {/* Floating + button on mobile (planner only) */}
+      {view === 'plan' && (
       <button
         onClick={openNew}
         aria-label="add new entry"
@@ -698,6 +731,7 @@ export default function App() {
       >
         ＋
       </button>
+      )}
     </div>
   );
 }
