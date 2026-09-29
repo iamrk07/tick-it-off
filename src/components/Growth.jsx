@@ -1,11 +1,86 @@
 import { useMemo, useState } from 'react';
 import { uid, now } from '../lib/store.js';
-import { todayLocal, last14, calcStreak, mondayStr, prettyDate } from '../lib/growth.js';
+import { todayLocal, calcStreak, mondayStr, prettyDate, monthGrid, monthLabel } from '../lib/growth.js';
 
 const COLORS = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
-const TICONS = ['🏋️', '📖', '🏃', '🧘', '💧', '😴', '📝', '🎸', '💰', '🌱', '🚭', '🎯'];
+const TICONS = ['🏋️', '📖', '🏃', '🧘', '🏊', '🚴', '💧', '😴', '📝', '🎸', '💰', '🌱', '🚭', '🎯'];
 
-const blankTracker = () => ({ name: '', unit: 'times', target: '', color: COLORS[0], icon: TICONS[0] });
+// One-tap column sets for common activities
+const PRESETS = {
+  gym: [
+    { label: 'Weight (kg)', type: 'number' },
+    { label: 'Exercises', type: 'text' },
+  ],
+  reading: [
+    { label: 'Book', type: 'text' },
+    { label: 'Pages', type: 'number' },
+    { label: 'Minutes', type: 'number' },
+  ],
+  mindfulness: [
+    { label: 'Minutes', type: 'number' },
+    { label: 'Technique', type: 'text' },
+  ],
+};
+
+const slug = (s) => (s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field');
+
+const blankTracker = () => ({ name: '', unit: 'times', target: '', color: COLORS[0], icon: TICONS[0], fields: [] });
+
+// Editor for a tracker's custom columns (weight, book, pages…). Used for new + edit.
+function FieldsEditor({ fields, setFields }) {
+  const [label, setLabel] = useState('');
+  const [type, setType] = useState('text');
+
+  const addField = () => {
+    if (!label.trim()) return;
+    if (fields.some((f) => f.label.toLowerCase() === label.trim().toLowerCase())) {
+      setLabel('');
+      return;
+    }
+    setFields([...fields, { key: `${slug(label.trim())}_${uid().slice(0, 4)}`, label: label.trim(), type }]);
+    setLabel('');
+  };
+
+  const addPreset = (list) => {
+    const have = new Set(fields.map((f) => f.label.toLowerCase()));
+    const next = [...fields];
+    list.forEach((p) => {
+      if (!have.has(p.label.toLowerCase())) next.push({ ...p, key: `${slug(p.label)}_${uid().slice(0, 4)}` });
+    });
+    setFields(next);
+  };
+
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 p-2.5 grid gap-1.5">
+      <p className="text-[11px] font-bold text-slate-500 uppercase">Columns for each log <span className="normal-case font-medium">(e.g. weight, book, minutes)</span></p>
+      {fields.length > 0 && (
+        <ul className="grid gap-1">
+          {fields.map((f) => (
+            <li key={f.key} className="flex items-center gap-2 text-xs bg-white border rounded-xl px-2.5 py-1.5">
+              <span className="font-bold flex-1">{f.label}</span>
+              <span className="text-slate-400 font-semibold">{f.type === 'number' ? '🔢 number' : '🔤 text'}</span>
+              <button onClick={() => setFields(fields.filter((x) => x.key !== f.key))} className="text-slate-300 hover:text-red-500 font-bold" aria-label={`remove ${f.label}`}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-1.5">
+        <input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addField()} placeholder="New column, e.g. Weight (kg)" className="input !py-1.5 !text-xs flex-1" />
+        <select value={type} onChange={(e) => setType(e.target.value)} className="input !py-1.5 !text-xs !w-auto">
+          <option value="text">Text</option>
+          <option value="number">Number</option>
+        </select>
+        <button onClick={addField} className="px-3 rounded-xl bg-slate-900 text-white text-xs font-bold">Add</button>
+      </div>
+      <div className="flex gap-1.5 flex-wrap text-[11px] font-bold">
+        <span className="text-slate-400 self-center">Quick sets:</span>
+        <button onClick={() => addPreset(PRESETS.gym)} className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200">🏋️ Gym</button>
+        <button onClick={() => addPreset(PRESETS.reading)} className="px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-200">📖 Reading</button>
+        <button onClick={() => addPreset(PRESETS.mindfulness)} className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200">🧘 Calm</button>
+      </div>
+    </div>
+  );
+}
 
 // Props: data, setData (same store interface), gtab/setGtab for mobile panes
 export default function Growth({ data, setData, gtab, setGtab }) {
@@ -20,9 +95,14 @@ export default function Growth({ data, setData, gtab, setGtab }) {
   const [showNew, setShowNew] = useState(false);
   const [draft, setDraft] = useState(blankTracker());
   const [editing, setEditing] = useState(false);
-  const [logForm, setLogForm] = useState({ value: '1', note: '', date: todayLocal() });
+  const [logForm, setLogForm] = useState({ value: '1', note: '', date: todayLocal(), extra: {} });
+  const [cal, setCal] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
 
   const sel = trackers.find((t) => t.id === (selId ?? trackers[0]?.id)) ?? null;
+  const selFields = sel?.fields || [];
 
   // Per-tracker mini stats for the list
   const statMap = useMemo(() => {
@@ -42,7 +122,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
     return m;
   }, [trackers, logs]);
 
-  // Selected tracker detail stats
+  // Selected tracker logs + calendar lookup
   const selLogs = useMemo(
     () =>
       logs
@@ -50,19 +130,13 @@ export default function Growth({ data, setData, gtab, setGtab }) {
         .sort((a, b) => b.log_date.localeCompare(a.log_date) || (b.created_at ?? '').localeCompare(a.created_at ?? '')),
     [logs, sel?.id]
   );
-  const byDate = useMemo(() => {
-    const m = {};
-    selLogs.forEach((l) => {
-      m[l.log_date] = (m[l.log_date] ?? 0) + Number(l.value || 0);
-    });
-    return m;
-  }, [selLogs]);
-  const days = useMemo(last14, []);
-  const maxDay = Math.max(1, ...days.map((d) => byDate[d.date] ?? 0));
+  const loggedDates = useMemo(() => new Set(selLogs.map((l) => l.log_date)), [selLogs]);
   const selStats = sel ? statMap[sel.id] ?? { streak: 0, week: 0, sessions: 0 } : null;
   const weekPct = sel?.target_per_week
     ? Math.min(100, Math.round(((selStats?.week ?? 0) / sel.target_per_week) * 100))
     : null;
+  const weeks = useMemo(() => monthGrid(cal.y, cal.m), [cal]);
+  const today = todayLocal();
 
   // ---------- actions ----------
   const addTracker = () => {
@@ -73,6 +147,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       id, user_id: me, name: draft.name.trim(), icon: draft.icon, color: draft.color,
       unit: draft.unit.trim() || 'times',
       target_per_week: draft.target === '' ? null : Number(draft.target),
+      fields: draft.fields || [],
       sort_order: max + 1, created_at: now(),
     };
     setData((d) => ({ ...d, trackers: [...(d.trackers || []), row] }));
@@ -88,6 +163,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       name: draft.name.trim(), icon: draft.icon, color: draft.color,
       unit: draft.unit.trim() || 'times',
       target_per_week: draft.target === '' ? null : Number(draft.target),
+      fields: draft.fields || [],
     };
     setData((d) => ({ ...d, trackers: d.trackers.map((t) => (t.id === sel.id ? { ...t, ...patch } : t)) }));
     setEditing(false);
@@ -103,19 +179,33 @@ export default function Growth({ data, setData, gtab, setGtab }) {
     if (selId === id) setSelId(null);
   };
 
+  const buildExtra = () => {
+    const extra = {};
+    selFields.forEach((f) => {
+      const raw = logForm.extra[f.key];
+      if (raw === undefined || raw === '') return;
+      extra[f.key] = f.type === 'number' ? Number(raw) : String(raw).trim();
+      if (f.type === 'number' && Number.isNaN(extra[f.key])) delete extra[f.key];
+    });
+    return extra;
+  };
+
+  const resetLogForm = (date) => setLogForm({ value: '1', note: '', date: date || todayLocal(), extra: {} });
+
   const addLog = () => {
     if (!sel) return;
     const v = Number(logForm.value);
     if (!(v > 0)) return alert('Enter a value above 0.');
     if (!logForm.date) return alert('Pick a date.');
+    const extra = buildExtra();
     setData((d) => ({
       ...d,
       tracker_logs: [...(d.tracker_logs || []), {
         id: uid(), tracker_id: sel.id, user_id: me,
-        log_date: logForm.date, value: v, note: logForm.note.trim(), created_at: now(),
+        log_date: logForm.date, value: v, note: logForm.note.trim(), extra, created_at: now(),
       }],
     }));
-    setLogForm({ value: '1', note: '', date: todayLocal() });
+    resetLogForm();
   };
 
   const quickLog = () => {
@@ -124,7 +214,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       ...d,
       tracker_logs: [...(d.tracker_logs || []), {
         id: uid(), tracker_id: sel.id, user_id: me,
-        log_date: todayLocal(), value: 1, note: '', created_at: now(),
+        log_date: todayLocal(), value: 1, note: '', extra: {}, created_at: now(),
       }],
     }));
   };
@@ -137,6 +227,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
   const pick = (id) => {
     setSelId(id);
     setEditing(false);
+    resetLogForm();
     setGtab('progress');
   };
 
@@ -145,8 +236,21 @@ export default function Growth({ data, setData, gtab, setGtab }) {
     setDraft({
       name: sel.name, unit: sel.unit ?? 'times',
       target: sel.target_per_week ?? '', color: sel.color, icon: sel.icon,
+      fields: sel.fields || [],
     });
     setEditing(true);
+  };
+
+  const jumpToDate = (date) => {
+    setLogForm((f) => ({ ...f, date }));
+    document.getElementById('growth-log-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const shiftMonth = (dir) => {
+    setCal((c) => {
+      const d = new Date(c.y, c.m + dir, 1);
+      return { y: d.getFullYear(), m: d.getMonth() };
+    });
   };
 
   return (
@@ -155,7 +259,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       <section className={`card p-4 ${gtab === 'trackers' ? '' : 'hidden lg:block'}`}>
         <div className="flex items-center justify-between">
           <h2 className="font-display font-bold text-lg">📈 Growth</h2>
-          <button onClick={() => setShowNew((v) => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white">
+          <button onClick={() => { setDraft(blankTracker()); setShowNew((v) => !v); }} className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white">
             {showNew ? 'Close' : '＋ New'}
           </button>
         </div>
@@ -177,6 +281,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                 <button key={e} onClick={() => setDraft({ ...draft, icon: e })} className={`w-7 h-7 rounded-lg border ${draft.icon === e ? 'border-slate-900 bg-slate-100' : ''}`}>{e}</button>
               ))}
             </div>
+            <FieldsEditor fields={draft.fields} setFields={(f) => setDraft({ ...draft, fields: f })} />
             <button onClick={addTracker} className="btn-primary py-2 text-sm">Create tracker</button>
           </div>
         )}
@@ -186,7 +291,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
             <div className="text-center py-8">
               <div className="text-4xl">🌱</div>
               <p className="font-bold mt-2 text-sm">No trackers yet</p>
-              <p className="text-xs text-slate-500">Track gym, books, anything — hit ＋ New.</p>
+              <p className="text-xs text-slate-500">Track gym, books, calm — hit ＋ New.</p>
             </div>
           )}
           {trackers.map((t) => {
@@ -221,7 +326,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
         </div>
       </section>
 
-      {/* RIGHT: detail + log + chart + history */}
+      {/* RIGHT: detail + log + calendar + record table */}
       <div className={`grid gap-4 ${gtab === 'progress' ? '' : 'hidden lg:grid'}`}>
         {!sel ? (
           <section className="card p-8 text-center">
@@ -237,7 +342,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                   <span className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl shrink-0" style={{ background: `${sel.color}1e` }}>{sel.icon}</span>
                   <div className="min-w-0">
                     <h2 className="font-display font-bold text-xl truncate">{sel.name}</h2>
-                    <p className="text-xs text-slate-500">Measured in {sel.unit}{sel.target_per_week ? ` · goal ${sel.target_per_week}/week` : ''}</p>
+                    <p className="text-xs text-slate-500">Measured in {sel.unit}{sel.target_per_week ? ` · goal ${sel.target_per_week}/week` : ''}{selFields.length ? ` · ${selFields.length} extra columns` : ''}</p>
                   </div>
                 </div>
                 <div className="flex gap-1.5 shrink-0 text-xs font-bold">
@@ -263,6 +368,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                       <button key={e} onClick={() => setDraft({ ...draft, icon: e })} className={`w-7 h-7 rounded-lg border ${draft.icon === e ? 'border-slate-900 bg-white' : ''}`}>{e}</button>
                     ))}
                   </div>
+                  <FieldsEditor fields={draft.fields} setFields={(f) => setDraft({ ...draft, fields: f })} />
                   <div className="flex gap-2">
                     <button onClick={saveTracker} className="flex-1 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold">Save</button>
                     <button onClick={() => setEditing(false)} className="px-4 rounded-xl border text-sm font-bold">Cancel</button>
@@ -299,61 +405,120 @@ export default function Growth({ data, setData, gtab, setGtab }) {
               )}
             </section>
 
-            <section className="card p-4">
+            <section id="growth-log-card" className="card p-4 scroll-mt-24">
               <h3 className="font-display font-bold text-base">✅ Log activity</h3>
               <button onClick={quickLog} className="btn-primary w-full py-2.5 text-sm mt-2 shadow-lg shadow-violet-200">
                 ＋ Log 1 {sel.unit} today
               </button>
-              <div className="grid grid-cols-[1fr_1fr] gap-2 mt-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase">Value
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">Value ({sel.unit})
                   <input value={logForm.value} onChange={(e) => setLogForm({ ...logForm, value: e.target.value })} type="number" min="0" step="any" inputMode="decimal" className="input mt-1" />
                 </label>
                 <label className="text-[11px] font-bold text-slate-500 uppercase">Date
                   <input value={logForm.date} onChange={(e) => setLogForm({ ...logForm, date: e.target.value })} type="date" className="input mt-1" />
                 </label>
               </div>
+              {selFields.length > 0 && (
+                <div className="grid sm:grid-cols-2 gap-2 mt-2">
+                  {selFields.map((f) => (
+                    <label key={f.key} className="text-[11px] font-bold text-slate-500 uppercase">{f.label}
+                      <input
+                        value={logForm.extra[f.key] ?? ''}
+                        onChange={(e) => setLogForm({ ...logForm, extra: { ...logForm.extra, [f.key]: e.target.value } })}
+                        type={f.type === 'number' ? 'number' : 'text'}
+                        step="any"
+                        inputMode={f.type === 'number' ? 'decimal' : 'text'}
+                        placeholder={f.type === 'number' ? '0' : '…'}
+                        className="input mt-1"
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
               <input value={logForm.note} onChange={(e) => setLogForm({ ...logForm, note: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && addLog()} placeholder="Note (optional) — e.g. Chest day, Ch. 4…" className="input mt-2" />
               <button onClick={addLog} className="w-full py-2.5 rounded-xl border mt-2 text-sm font-bold hover:bg-slate-50">Save log</button>
             </section>
 
             <section className="card p-4">
-              <h3 className="font-display font-bold text-base">Last 14 days</h3>
-              <div className="flex items-end gap-1 h-24 mt-3">
-                {days.map((d) => {
-                  const v = byDate[d.date] ?? 0;
-                  const isToday = d.date === todayLocal();
-                  return (
-                    <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${d.date}: ${v} ${sel.unit}`}>
-                      <div className="w-full flex items-end justify-center h-16">
-                        <div
-                          className="w-full max-w-6 rounded-t-md"
-                          style={{ height: `${Math.max(v > 0 ? 8 : 3, (v / maxDay) * 100)}%`, background: v > 0 ? sel.color : '#e2e8f0', outline: isToday ? `2px solid ${sel.color}` : 'none' }}
-                        />
-                      </div>
-                      <span className={`text-[9px] font-bold ${isToday ? 'text-slate-900' : 'text-slate-400'}`}>{d.label}</span>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold text-base">🗓️ {monthLabel(cal.y, cal.m)}</h3>
+                <div className="flex gap-1.5 text-xs font-bold">
+                  <button onClick={() => shiftMonth(-1)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200" aria-label="previous month">‹ Prev</button>
+                  <button onClick={() => { const d = new Date(); setCal({ y: d.getFullYear(), m: d.getMonth() }); }} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">Today</button>
+                  <button onClick={() => shiftMonth(1)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200" aria-label="next month">Next ›</button>
+                </div>
               </div>
+              <div className="grid grid-cols-7 gap-1 mt-3 text-center text-[10px] font-bold text-slate-400 uppercase">
+                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+              </div>
+              <div className="grid gap-1 mt-1">
+                {weeks.map((week, wi) => (
+                  <div key={wi} className="grid grid-cols-7 gap-1">
+                    {week.map((date, di) => {
+                      if (!date) return <span key={di} />;
+                      const logged = loggedDates.has(date);
+                      const isToday = date === today;
+                      const missed = !logged && date < today;
+                      const dayNum = Number(date.slice(8, 10));
+                      return (
+                        <button
+                          key={di}
+                          onClick={() => jumpToDate(date)}
+                          title={date + (logged ? ' — logged ✓ (tap to add more)' : missed ? ' — missed (tap to log)' : ' — tap to log')}
+                          className={`aspect-square rounded-xl text-xs font-bold flex flex-col items-center justify-center transition
+                            ${logged ? 'text-white shadow' : missed ? 'bg-red-50 text-red-300 hover:bg-red-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}
+                            ${isToday ? 'ring-2 ring-offset-1' : ''}`}
+                          style={logged ? { background: sel.color, ...(isToday ? { '--tw-ring-color': sel.color } : {}) } : isToday ? { '--tw-ring-color': '#94a3b8' } : undefined}
+                        >
+                          <span>{dayNum}</span>
+                          {logged && <span className="text-[9px] leading-none">✓</span>}
+                          {missed && <span className="text-[9px] leading-none">·</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Tap any day to log for it — red days are missed. Streaks survive one missed today until tomorrow.</p>
             </section>
 
-            <section className="card p-4">
-              <h3 className="font-display font-bold text-base">History</h3>
+            <section className="card p-4 overflow-hidden">
+              <h3 className="font-display font-bold text-base">🧾 Record table</h3>
               {selLogs.length === 0 ? (
-                <p className="text-sm text-slate-500 mt-2">Nothing logged yet — hit “Log 1 {sel.unit} today” above. 💪</p>
+                <p className="text-sm text-slate-500 mt-2">Nothing logged yet — your day-by-day record (weight, exercises, book, pages…) will appear here. 💪</p>
               ) : (
-                <ul className="mt-2 divide-y divide-slate-100">
-                  {selLogs.map((l) => (
-                    <li key={l.id} className="py-2 flex items-center gap-2 text-sm">
-                      <span className="font-extrabold whitespace-nowrap" style={{ color: sel.color }}>+{Number(l.value)} {sel.unit}</span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block font-semibold text-slate-700">{prettyDate(l.log_date)}</span>
-                        {l.note && <span className="block text-xs text-slate-500 truncate">{l.note}</span>}
-                      </span>
-                      <button onClick={() => deleteLog(l.id)} className="text-slate-300 hover:text-red-500 px-1" aria-label="delete log">✕</button>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-2 -mx-4 px-4 overflow-x-auto nice-scroll">
+                  <table className="w-full text-sm whitespace-nowrap">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-wide text-slate-400 border-b">
+                        <th className="text-left font-bold py-2 pr-3">Date</th>
+                        <th className="text-left font-bold py-2 pr-3">{sel.unit}</th>
+                        {selFields.map((f) => (
+                          <th key={f.key} className="text-left font-bold py-2 pr-3">{f.label}</th>
+                        ))}
+                        <th className="text-left font-bold py-2 pr-3">Note</th>
+                        <th className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selLogs.map((l) => (
+                        <tr key={l.id} className="hover:bg-slate-50">
+                          <td className="py-2 pr-3 font-semibold">{prettyDate(l.log_date)}</td>
+                          <td className="py-2 pr-3 font-extrabold" style={{ color: sel.color }}>+{Number(l.value)}</td>
+                          {selFields.map((f) => (
+                            <td key={f.key} className="py-2 pr-3 text-slate-600">
+                              {l.extra?.[f.key] ?? <span className="text-slate-300">—</span>}
+                            </td>
+                          ))}
+                          <td className="py-2 pr-3 text-slate-500 text-xs max-w-[180px] truncate">{l.note || <span className="text-slate-300">—</span>}</td>
+                          <td className="py-2">
+                            <button onClick={() => deleteLog(l.id)} className="text-slate-300 hover:text-red-500 font-bold px-1" aria-label="delete log">✕</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </section>
           </>

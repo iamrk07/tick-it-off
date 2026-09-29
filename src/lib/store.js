@@ -36,8 +36,10 @@ export function defaultCategories(userId) {
 
 export function defaultTrackers(userId) {
   return [
-    { id: uid(), user_id: userId, name: 'Gym', icon: '🏋️', color: '#10b981', unit: 'workouts', target_per_week: 4, sort_order: 0, created_at: now() },
-    { id: uid(), user_id: userId, name: 'Reading', icon: '📖', color: '#8b5cf6', unit: 'pages', target_per_week: 100, sort_order: 1, created_at: now() },
+    { id: uid(), user_id: userId, name: 'Gym', icon: '🏋️', color: '#10b981', unit: 'workouts', target_per_week: 4, sort_order: 0, created_at: now(),
+      fields: [{ key: 'weight', label: 'Weight (kg)', type: 'number' }, { key: 'exercises', label: 'Exercises', type: 'text' }] },
+    { id: uid(), user_id: userId, name: 'Reading', icon: '📖', color: '#8b5cf6', unit: 'pages', target_per_week: 100, sort_order: 1, created_at: now(),
+      fields: [{ key: 'book', label: 'Book', type: 'text' }, { key: 'pages', label: 'Pages', type: 'number' }, { key: 'minutes', label: 'Minutes', type: 'number' }] },
   ];
 }
 
@@ -63,6 +65,13 @@ function migrate(raw) {
   if (!Array.isArray(d.subitems)) d.subitems = [];
   if (!Array.isArray(d.trackers)) d.trackers = [];
   if (!Array.isArray(d.tracker_logs)) d.tracker_logs = [];
+  // Custom-column defaults for data created before custom fields existed
+  d.trackers.forEach((t) => {
+    if (!Array.isArray(t.fields)) t.fields = [];
+  });
+  d.tracker_logs.forEach((l) => {
+    if (!l.extra || typeof l.extra !== 'object') l.extra = {};
+  });
   // Archive defaults for items created before archiving existed
   d.items.forEach((i) => {
     if (i.is_archived === undefined) i.is_archived = false;
@@ -187,11 +196,13 @@ export async function pushCloud(userId, data) {
   const dbTrackers = (data.trackers || []).map((t) => ({
     id: t.id, user_id: userId, name: t.name, icon: t.icon, color: t.color,
     unit: t.unit ?? 'times', target_per_week: t.target_per_week ?? null,
+    fields: t.fields ?? [],
     sort_order: t.sort_order, created_at: t.created_at,
   }));
   const dbLogs = (data.tracker_logs || []).map((l) => ({
     id: l.id, tracker_id: l.tracker_id, user_id: userId, log_date: l.log_date,
-    value: Number(l.value) || 0, note: l.note ?? '', created_at: l.created_at,
+    value: Number(l.value) || 0, note: l.note ?? '', extra: l.extra ?? {},
+    created_at: l.created_at,
   }));
 
   if (dbCats.length) {

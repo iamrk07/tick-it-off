@@ -44,3 +44,26 @@ export function prettyDate(iso) {
     return iso;
   }
 }
+
+// Month grid (weeks start Monday). Returns weeks of 7 cells:
+// each cell is 'YYYY-MM-DD' or null (padding).
+export function monthGrid(year, month) {
+  const first = new Date(year, month, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(fmtDay(new Date(year, month, d)));
+  while (cells.length % 7) cells.push(null);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+export function monthLabel(year, month) {
+  try {
+    return new Date(year, month, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  } catch {
+    return `${month + 1}/${year}`;
+  }
+}

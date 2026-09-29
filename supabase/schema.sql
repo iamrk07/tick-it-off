@@ -81,7 +81,8 @@ create table if not exists trackers (
   unit text default 'times',
   target_per_week int,
   sort_order int default 0,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  fields jsonb default '[]'
 );
 
 create table if not exists tracker_logs (
@@ -91,6 +92,7 @@ create table if not exists tracker_logs (
   log_date date not null default CURRENT_DATE,
   value numeric default 1,
   note text default '',
+  extra jsonb default '{}',
   created_at timestamptz default now()
 );
 
@@ -110,3 +112,7 @@ create index if not exists idx_tlogs_tracker on tracker_logs(tracker_id, log_dat
 
 grant all on public.trackers to authenticated;
 grant all on public.tracker_logs to authenticated;
+
+-- Custom columns upgrade (for DBs created before fields/extra existed)
+alter table trackers add column if not exists fields jsonb default '[]';
+alter table tracker_logs add column if not exists extra jsonb default '{}';
