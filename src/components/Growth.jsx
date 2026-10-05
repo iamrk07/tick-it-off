@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { uid, now } from '../lib/store.js';
-import { todayLocal, calcStreak, mondayStr, prettyDate, monthGrid, monthLabel } from '../lib/growth.js';
+import { todayLocal, calcStreak, mondayStr, monthGrid, monthLabel, fmtDateLong, plural } from '../lib/growth.js';
 
 const COLORS = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
 const TICONS = ['🏋️', '📖', '🏃', '🧘', '🏊', '🚴', '💧', '😴', '📝', '🎸', '💰', '🌱', '🚭', '🎯'];
@@ -59,7 +59,7 @@ function FieldsEditor({ fields, setFields }) {
             <li key={f.key} className="flex items-center gap-2 text-xs bg-white border rounded-xl px-2.5 py-1.5">
               <span className="font-bold flex-1">{f.label}</span>
               <span className="text-slate-400 font-semibold">{f.type === 'number' ? '🔢 number' : '🔤 text'}</span>
-              <button onClick={() => setFields(fields.filter((x) => x.key !== f.key))} className="text-slate-300 hover:text-red-500 font-bold" aria-label={`remove ${f.label}`}>✕</button>
+              <button onClick={() => setFields(fields.filter((x) => x.key !== f.key))} className="text-slate-300 hover:text-red-500 font-bold px-2 py-0.5" aria-label={`remove ${f.label}`}>✕</button>
             </li>
           ))}
         </ul>
@@ -137,6 +137,8 @@ export default function Growth({ data, setData, gtab, setGtab }) {
     : null;
   const weeks = useMemo(() => monthGrid(cal.y, cal.m), [cal]);
   const today = todayLocal();
+  // Missed days only count from the tracker's creation day — never before it existed
+  const createdDay = (sel?.created_at || '').slice(0, 10);
 
   // ---------- actions ----------
   const addTracker = () => {
@@ -305,7 +307,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                   <span className="w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${t.color}1e` }}>{t.icon}</span>
                   <span className="flex-1 min-w-0">
                     <span className="block font-bold text-sm truncate">{t.name}</span>
-                    <span className="block text-[11px] text-slate-400">🔥 {st.streak} day streak · {st.sessions} logs</span>
+                    <span className="block text-[11px] text-slate-400">🔥 {plural(st.streak, 'day')} streak · {plural(st.sessions, 'log')}</span>
                   </span>
                 </span>
                 <span className="block h-1.5 rounded-full bg-slate-100 mt-2 overflow-hidden">
@@ -408,7 +410,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
             <section id="growth-log-card" className="card p-4 scroll-mt-24">
               <h3 className="font-display font-bold text-base">✅ Log activity</h3>
               <button onClick={quickLog} className="btn-primary w-full py-2.5 text-sm mt-2 shadow-lg shadow-violet-200">
-                ＋ Log 1 {sel.unit} today
+                ＋ Log today
               </button>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 <label className="text-[11px] font-bold text-slate-500 uppercase">Value ({sel.unit})
@@ -458,7 +460,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                       if (!date) return <span key={di} />;
                       const logged = loggedDates.has(date);
                       const isToday = date === today;
-                      const missed = !logged && date < today;
+                      const missed = !logged && date < today && date >= createdDay;
                       const dayNum = Number(date.slice(8, 10));
                       return (
                         <button
@@ -479,7 +481,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">Tap any day to log for it — red days are missed. Streaks survive one missed today until tomorrow.</p>
+              <p className="text-[11px] text-slate-400 mt-2">Tap any day to log for it — red days are missed (counted from when the tracker was created).</p>
             </section>
 
             <section className="card p-4 overflow-hidden">
@@ -503,7 +505,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                     <tbody className="divide-y divide-slate-100">
                       {selLogs.map((l) => (
                         <tr key={l.id} className="hover:bg-slate-50">
-                          <td className="py-2 pr-3 font-semibold">{prettyDate(l.log_date)}</td>
+                          <td className="py-2 pr-3 font-semibold">{fmtDateLong(l.log_date)}</td>
                           <td className="py-2 pr-3 font-extrabold" style={{ color: sel.color }}>+{Number(l.value)}</td>
                           {selFields.map((f) => (
                             <td key={f.key} className="py-2 pr-3 text-slate-600">

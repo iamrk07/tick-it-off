@@ -3,28 +3,14 @@ import { useStore, useCloudStore, uid, now, LOCAL_USER_ID } from './lib/store.js
 import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
 import Growth from './components/Growth.jsx';
-import { calcStreak } from './lib/growth.js';
+import { calcStreak, plural, fmtShort, fmtDateTime } from './lib/growth.js';
 import { toJSON, toCSV } from './lib/export.js';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
 const ICONS = ['📚', '☕', '✈️', '💬', '🧠', '⏰', '⭐', '🎯', '📝', '💡', '🎨', '🌿'];
 
-const fmt = (iso) => {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return iso;
-  }
-};
-const fmtFull = (iso) => {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-};
+const fmt = (iso) => fmtShort(iso);
+const fmtFull = (iso) => fmtDateTime(iso);
 
 function emptyItem(catId) {
   return { category_id: catId ?? '', title: '', notes: '', link: '', is_checklist: false, subs: [''] };
@@ -377,13 +363,12 @@ export default function App() {
                   </button>
                 </div>
               )}
-              <p className="text-white/80 text-xs sm:text-sm mt-0.5 italic">“{todayQuote()}”</p>
               <div className="flex gap-2 mt-2 text-[11px]">
                 {view === 'plan' && (
                   <>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">🔥 {activeCount} active</span>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">✅ {doneCount} done</span>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline whitespace-nowrap">📁 {cats.length} categories</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline whitespace-nowrap">📁 {plural(cats.length, 'category', 'categories')}</span>
                     {archivedCount > 0 && <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📦 {archivedCount} archived</span>}
                   </>
                 )}
@@ -394,10 +379,14 @@ export default function App() {
             </div>
             <div className="flex flex-col gap-2 shrink-0 items-end">
               <AuthArea session={session} sync={cloudMeta.sync} onRefresh={cloudMeta.refresh} />
-              <div className="flex gap-2">
-                <button onClick={() => toJSON(data)} className="px-3 py-1.5 rounded-xl bg-white text-slate-900 text-xs font-bold shadow">⬇ JSON</button>
-                <button onClick={() => toCSV(data)} className="px-3 py-1.5 rounded-xl bg-white/15 border border-white/30 text-xs font-bold">⬇ CSV</button>
-              </div>
+              <details className="relative">
+                <summary className="px-3 py-1.5 rounded-xl bg-white/15 border border-white/30 text-xs font-bold cursor-pointer list-none [&::-webkit-details-marker]:hidden">⋯ Backup</summary>
+                <div className="absolute right-0 mt-1 w-48 card p-1.5 text-slate-900 text-xs font-bold z-30">
+                  <button onClick={() => toJSON(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">⬇ Download JSON</button>
+                  <button onClick={() => toCSV(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">⬇ Download CSV</button>
+                  {session && <button onClick={() => cloudMeta.refresh()} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">↻ Reload from cloud</button>}
+                </div>
+              </details>
             </div>
           </div>
           {view !== 'home' && (
@@ -431,7 +420,7 @@ export default function App() {
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
             <span className="bg-white/20 rounded-full px-3 py-1">🔥 {activeCount} active</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">📁 {cats.length} categories</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">📁 {plural(cats.length, 'category', 'categories')}</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
@@ -447,10 +436,11 @@ export default function App() {
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
             <span className="bg-white/20 rounded-full px-3 py-1">🔥 {bestStreak} best streak</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">📈 {(data.trackers || []).length} trackers</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">📈 {plural((data.trackers || []).length, 'tracker')}</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
+        <p className="text-center text-xs text-slate-400 italic sm:col-span-2 -mt-1">“{todayQuote()}”</p>
       </div>
       ) : view === 'plan' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 grid gap-4 lg:grid-cols-[290px_minmax(0,1fr)_380px] items-start pb-28 lg:pb-10">
@@ -673,11 +663,7 @@ export default function App() {
                 <h2 className="font-display font-bold text-xl">{editingItem ? '📝 Edit entry' : '＋ New entry'}</h2>
                 <button onClick={closeModal} aria-label="close" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 font-bold">✕</button>
               </div>
-              {!editingItem && (
-                <p className="text-xs mt-1 px-2.5 py-1.5 rounded-xl inline-block font-bold text-white" style={{ background: form.category_id === '__new__' ? newCat.color : formCat?.color ?? '#64748b' }}>
-                  {form.category_id === '__new__' ? `📍 New category: ${newCat.name.trim() || '…'}` : `📍 Adding to: ${formCat ? `${formCat.icon} ${formCat.name}` : '…'}`}
-                </p>
-              )}
+              {/* Destination shown by the Category dropdown below */}
             </div>
             <div className="grid gap-2.5 p-5">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
@@ -702,13 +688,10 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Entry type</span>
-                <label className="flex items-center gap-1.5 text-xs font-bold bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 cursor-pointer">
-                  <input type="checkbox" checked={form.is_checklist} onChange={(e) => setForm({ ...form, is_checklist: e.target.checked })} className="w-4 h-4 accent-violet-600" />
-                  ☑ Checklist with sub-tasks
-                </label>
-              </div>
+              <label className="flex items-center gap-2 text-sm font-bold bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 cursor-pointer">
+                <input type="checkbox" checked={form.is_checklist} onChange={(e) => setForm({ ...form, is_checklist: e.target.checked })} className="w-5 h-5 accent-violet-600" />
+                Make it a checklist
+              </label>
               <input value={form.title} autoFocus onChange={(e) => setForm({ ...form, title: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && saveItem()} placeholder="Title (required)…" className="input font-semibold !py-3 !text-base" />
               <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notes, thoughts, details…" rows={3} className="input" />
               <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="https:// link (optional)" inputMode="url" className="input" />
@@ -727,7 +710,7 @@ export default function App() {
                         placeholder={`Sub-task ${idx + 1}…`}
                         className="input !py-2"
                       />
-                      <button onClick={() => setForm({ ...form, subs: form.subs.filter((_, k) => k !== idx) })} className="px-2 text-slate-400 hover:text-red-500" aria-label="remove sub-task">✕</button>
+                      <button onClick={() => setForm({ ...form, subs: form.subs.filter((_, k) => k !== idx) })} className="px-3 py-1 text-slate-400 hover:text-red-500 font-bold" aria-label="remove sub-task">✕</button>
                     </div>
                   ))}
                   <button onClick={() => setForm({ ...form, subs: [...form.subs, editingItem ? { text: '' } : ''] })} className="text-xs font-bold text-violet-700 text-left px-1">+ Add sub-task</button>

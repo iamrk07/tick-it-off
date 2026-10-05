@@ -67,3 +67,43 @@ export function monthLabel(year, month) {
     return `${month + 1}/${year}`;
   }
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function asDate(v) {
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Unambiguous dates everywhere: "5 Oct 2026"
+export function fmtDateLong(v) {
+  if (!v) return '—';
+  const d = asDate(v);
+  if (!d) return String(v);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Lists: "5 Oct, 11:09 AM"
+export function fmtShort(v) {
+  if (!v) return '—';
+  const d = asDate(v);
+  if (!d) return String(v);
+  let h = d.getHours();
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
+}
+
+// Details: "5 Oct 2026, 11:09 AM"
+export function fmtDateTime(v) {
+  if (!v) return '—';
+  const d = asDate(v);
+  if (!d) return String(v);
+  let h = d.getHours();
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
+}
+
+// "1 tracker", "3 trackers", "1 category", "5 categories"
+export const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
