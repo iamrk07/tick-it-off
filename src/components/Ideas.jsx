@@ -5,10 +5,10 @@ import { fmtDateLong, fmtDayMon, plural } from '../lib/growth.js';
 const COLORS = ['#f59e0b', '#8b5cf6', '#10b981', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
 const PICONS = ['💡', '🚀', '💼', '🎨', '📚', '🏋️', '💰', '🌱', '🎯', '⭐', '📝', '🎸'];
 const STATUSES = [
-  ['idea', '💡 Idea'],
-  ['active', '🚀 Active'],
-  ['parked', '🅿️ Parked'],
-  ['done', '✅ Done'],
+  ['idea', 'Idea'],
+  ['active', 'Active'],
+  ['parked', 'Parked'],
+  ['done', 'Done'],
 ];
 const statusLabel = (s) => (STATUSES.find(([k]) => k === s) || ['?', s])[1];
 
@@ -142,7 +142,7 @@ export default function Ideas({ data, setData, itab, setItab }) {
       {/* LEFT: ventures */}
       <section className={`card p-4 ${itab === 'projects' ? '' : 'hidden lg:block'}`}>
         <div className="flex items-center justify-between">
-          <h2 className="font-display font-bold text-lg">💡 Ideas</h2>
+          <h2 className="font-display font-bold text-lg">Ideas</h2>
           <button onClick={() => { setDraft(blankProject()); setShowNew((v) => !v); }} className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white">
             {showNew ? 'Close' : '＋ New'}
           </button>
@@ -186,7 +186,6 @@ export default function Ideas({ data, setData, itab, setItab }) {
         <div className="mt-2 grid gap-1.5">
           {visible.length === 0 && (
             <div className="text-center py-8">
-              <div className="text-4xl">💡</div>
               <p className="font-bold mt-2 text-sm">Nothing here</p>
               <p className="text-xs text-slate-500">Start a venture with ＋ New.</p>
             </div>
@@ -275,7 +274,7 @@ export default function Ideas({ data, setData, itab, setItab }) {
                   {sel.notes && <p className="text-sm text-slate-700 whitespace-pre-wrap mt-3 bg-slate-50 rounded-xl p-3">{sel.notes}</p>}
                   {sel.link && (
                     <a href={/^https?:\/\//i.test(sel.link) ? sel.link : `https://${sel.link}`} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-rose-500 rounded-xl px-3 py-2.5 break-all">
-                      🔗 {sel.link} <span aria-hidden>↗</span>
+                       {sel.link} <span aria-hidden>↗</span>
                     </a>
                   )}
                 </>
@@ -283,7 +282,7 @@ export default function Ideas({ data, setData, itab, setItab }) {
             </section>
 
             <section className="card p-4">
-              <h3 className="font-display font-bold text-base">✅ Venture to-dos ({linkedOpen} open)</h3>
+              <h3 className="font-display font-bold text-base">To-dos ({linkedOpen} open)</h3>
               <div className="flex gap-1.5 mt-2">
                 <input value={taskDraft} onChange={(e) => setTaskDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addLinkedTask()} placeholder={`Add a to-do for ${sel.name}…`} className="input !text-sm flex-1" />
                 <input value={taskDate} onChange={(e) => setTaskDate(e.target.value)} type="date" title="Date (empty = Master)" className="input !text-xs !w-auto" />
@@ -302,15 +301,15 @@ export default function Ideas({ data, setData, itab, setItab }) {
                       <span className="flex-1 min-w-0">
                         <span className={`block font-semibold text-[15px] truncate ${t.status === 'done' ? 'line-through' : ''}`}>{t.title}</span>
                         <span className="block text-[11px] text-slate-400">
-                          {t.scheduled_date ? fmtDateLong(t.scheduled_date) : '📥 Master'}
-                          {t.repeat && t.repeat !== 'none' ? ` · 🔁 ${t.repeat}` : ''}
+                          {t.scheduled_date ? fmtDateLong(t.scheduled_date) : 'Master'}
+                          {t.repeat && t.repeat !== 'none' ? ` · ↻ ${t.repeat}` : ''}
                         </span>
                       </span>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="text-[11px] text-slate-400 mt-2">Full edit lives in ✅ To-Do — these stay in sync everywhere. 🔁</p>
+              <p className="text-[11px] text-slate-400 mt-2">Full edit lives in To-Do — these stay in sync everywhere.</p>
             </section>
           </>
         )}

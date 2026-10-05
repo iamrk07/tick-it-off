@@ -3,14 +3,14 @@ import { supabase } from '../lib/supabase.js';
 
 function syncText(sync) {
   if (!sync) return '';
-  if (sync.state === 'loading') return '☁ Loading…';
-  if (sync.state === 'syncing' || sync.state === 'pending') return '☁ Syncing…';
-  if (sync.state === 'error') return `⚠ ${sync.error || 'Sync failed'} — retrying on next change`;
+  if (sync.state === 'loading') return 'Loading…';
+  if (sync.state === 'syncing' || sync.state === 'pending') return 'Syncing…';
+  if (sync.state === 'error') return `Sync failed (${sync.error || 'unknown'}) — retrying on next change`;
   if (sync.state === 'synced' && sync.at) {
     const t = sync.at instanceof Date ? sync.at : new Date(sync.at);
-    return `☁ Synced ${t.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+    return `Synced ${t.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
   }
-  return '☁ Cloud on';
+  return 'Cloud on';
 }
 
 // Login / signup button + modal, and the logged-in user chip.
@@ -66,13 +66,13 @@ export default function AuthArea({ session, sync, onRefresh }) {
           onClick={() => { setOpen(true); setMsg(''); setMode('signin'); }}
           className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow whitespace-nowrap"
         >
-          🔐 Log in / Sign up
+          Log in / Sign up
         </button>
         {open && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/55 backdrop-blur-sm p-0 sm:p-4" onClick={() => setOpen(false)}>
             <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 text-slate-900" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between">
-                <h2 className="font-display font-bold text-xl">{mode === 'signin' ? '🔐 Welcome back' : '✨ Create account'}</h2>
+                <h2 className="font-display font-bold text-xl">{mode === 'signin' ? 'Welcome back' : 'Create account'}</h2>
                 <button onClick={() => setOpen(false)} aria-label="close" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 font-bold">✕</button>
               </div>
               <p className="text-xs text-slate-500 mt-1">

@@ -23,13 +23,13 @@ const asLink = (l) => (/^https?:\/\//i.test(l) ? l : `https://${l}`);
 
 // A fresh line of fuel under the title — rotates daily
 const QUOTES = [
-  'Small steps every day. 🌱',
-  'Done is better than perfect. ✅',
-  'What gets written, gets done. 📝',
-  'Focus is a superpower. 🎯',
-  'One task at a time. 🐢',
-  'Future you says thanks. 🙏',
-  'Discipline beats motivation. 💪',
+  'Small steps every day.',
+  'Done is better than perfect.',
+  'What gets written, gets done.',
+  'Focus is a superpower.',
+  'One task at a time.',
+  'Future you says thanks.',
+  'Discipline beats motivation.',
 ];
 const todayQuote = () => QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
 
@@ -356,7 +356,6 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="card p-8 text-center max-w-sm">
-          <div className="text-5xl">☁️</div>
           <p className="font-display font-bold text-xl mt-3">Loading your space…</p>
           <p className="text-sm text-slate-500 mt-1">Pulling your synced entries from the cloud.</p>
           {cloudMeta.sync.state === 'error' && (
@@ -401,34 +400,34 @@ export default function App() {
                   <button
                     onClick={() => { setTitleDraft(appTitle); setEditingTitle(true); }}
                     title="Rename your space"
-                    className="text-white/80 hover:text-white text-sm bg-white/15 hover:bg-white/25 rounded-lg px-2 py-1"
+                    className="text-white/80 hover:text-white text-xs font-bold bg-white/15 hover:bg-white/25 rounded-lg px-2 py-1"
                   >
-                    ✏️
+                    Rename
                   </button>
                 </div>
               )}
               <div className="flex gap-2 mt-2 text-[11px]">
                 {view === 'plan' && (
                   <>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">🔥 {activeCount} active</span>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">✅ {doneCount} done</span>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline whitespace-nowrap">📁 {plural(cats.length, 'category', 'categories')}</span>
-                    {archivedCount > 0 && <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📦 {archivedCount} archived</span>}
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{activeCount} active</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{doneCount} done</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline whitespace-nowrap">{plural(cats.length, 'category', 'categories')}</span>
+                    {archivedCount > 0 && <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{archivedCount} archived</span>}
                   </>
                 )}
                 {view === 'growth' && (
-                  <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')} · 🔥 {bestStreak} best streak</span>
+                  <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')} · best streak {bestStreak}</span>
                 )}
                 {view === 'todo' && (
                   <>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">☀️ {todoTodayOpen} today</span>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📥 {todoMaster} master</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{todoTodayOpen} today</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{todoMaster} master</span>
                   </>
                 )}
                 {view === 'ideas' && (
                   <>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">💡 {(data.projects || []).length} ventures</span>
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">🚀 {ideasActive} active</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{(data.projects || []).length} ventures</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{ideasActive} active</span>
                   </>
                 )}
               </div>
@@ -438,8 +437,8 @@ export default function App() {
               <details className="relative">
                 <summary className="px-3 py-1.5 rounded-xl bg-white/15 border border-white/30 text-xs font-bold cursor-pointer list-none [&::-webkit-details-marker]:hidden">⋯ Backup</summary>
                 <div className="absolute right-0 mt-1 w-48 card p-1.5 text-slate-900 text-xs font-bold z-30">
-                  <button onClick={() => toJSON(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">⬇ Download JSON</button>
-                  <button onClick={() => toCSV(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">⬇ Download CSV</button>
+                  <button onClick={() => toJSON(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Download JSON</button>
+                  <button onClick={() => toCSV(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Download CSV</button>
                   {session && <button onClick={() => cloudMeta.refresh()} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">↻ Reload from cloud</button>}
                 </div>
               </details>
@@ -448,12 +447,11 @@ export default function App() {
           {view === 'plan' && (
           <div className="mt-3">
             <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search titles, notes, links…"
-                className="w-full pl-9 pr-3 py-2.5 rounded-2xl text-slate-900 text-[15px] shadow-inner outline-none focus:ring-4 ring-white/40"
+                className="w-full px-3 pr-3 py-2.5 rounded-2xl text-slate-900 text-[15px] shadow-inner outline-none focus:ring-4 ring-white/40"
               />
             </div>
           </div>
@@ -469,14 +467,14 @@ export default function App() {
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-sky-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1 60%, #8b5cf6)' }}
         >
-          <div>
-            <div className="text-5xl">✅</div>
-            <h2 className="font-display text-2xl font-bold mt-3">To-Do</h2>
+            <div>
+              <div className="text-5xl font-display font-bold text-white/90">T</div>
+              <h2 className="font-display text-2xl font-bold mt-3">To-Do</h2>
             <p className="text-white/80 text-sm mt-1">Master backlog, today's plan & 30-day history.</p>
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
-            <span className="bg-white/20 rounded-full px-3 py-1">☀️ {todoTodayOpen} today</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">📥 {todoMaster} master</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{todoTodayOpen} today</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{todoMaster} master</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
@@ -485,14 +483,14 @@ export default function App() {
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-violet-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed 55%, #db2777)' }}
         >
-          <div>
-            <div className="text-5xl">🪣</div>
-            <h2 className="font-display text-2xl font-bold mt-3">Bucket List</h2>
+            <div>
+              <div className="text-5xl font-display font-bold text-white/90">B</div>
+              <h2 className="font-display text-2xl font-bold mt-3">Bucket List</h2>
             <p className="text-white/80 text-sm mt-1">Dreams, places, books & things to do one day.</p>
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
-            <span className="bg-white/20 rounded-full px-3 py-1">🔥 {activeCount} active</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">📁 {plural(cats.length, 'category', 'categories')}</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{activeCount} active</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{plural(cats.length, 'category', 'categories')}</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
@@ -501,14 +499,14 @@ export default function App() {
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-orange-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316 55%, #ef4444)' }}
         >
-          <div>
-            <div className="text-5xl">💡</div>
-            <h2 className="font-display text-2xl font-bold mt-3">Ideas</h2>
+            <div>
+              <div className="text-5xl font-display font-bold text-white/90">I</div>
+              <h2 className="font-display text-2xl font-bold mt-3">Ideas</h2>
             <p className="text-white/80 text-sm mt-1">Ventures & projects with status, notes & to-dos.</p>
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
-            <span className="bg-white/20 rounded-full px-3 py-1">🚀 {ideasActive} active</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">💡 {(data.projects || []).length} ventures</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{ideasActive} active</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{(data.projects || []).length} ventures</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
@@ -517,14 +515,14 @@ export default function App() {
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-emerald-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #059669, #0d9488 55%, #0284c7)' }}
         >
-          <div>
-            <div className="text-5xl">📈</div>
-            <h2 className="font-display text-2xl font-bold mt-3">Growth</h2>
+            <div>
+              <div className="text-5xl font-display font-bold text-white/90">G</div>
+              <h2 className="font-display text-2xl font-bold mt-3">Growth</h2>
             <p className="text-white/80 text-sm mt-1">Track gym, reading, calm… streaks, tables & calendars.</p>
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
-            <span className="bg-white/20 rounded-full px-3 py-1">🔥 {bestStreak} best streak</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">📈 {plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')}</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">best streak {bestStreak}</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">{plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')}</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
@@ -536,14 +534,14 @@ export default function App() {
         {/* LEFT: categories */}
         <aside className={`card p-4 ${mobileTab === 'cats' ? '' : 'hidden lg:block'}`}>
           <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg">📁 Categories</h2>
+            <h2 className="font-display font-bold text-lg">Categories</h2>
             <button onClick={() => setManageCats((v) => !v)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">
-              {manageCats ? 'Done' : '⚙️ Manage'}
+              {manageCats ? 'Done' : 'Manage'}
             </button>
           </div>
           <div className="mt-3 grid gap-1.5">
             <CatRow
-              active={selectedCat === 'all'} color="#0f172a" icon="🌟" name="All entries"
+              active={selectedCat === 'all'} color="#0f172a" icon="○" name="All entries"
               count={data.items.length} onClick={() => selectCat('all')}
             />
             {cats.map((c) => (
@@ -569,7 +567,7 @@ export default function App() {
           </div>
           {manageCats && <NewCategory onAdd={addCategory} />}
           {!manageCats && (
-            <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">Tap ⚙️ Manage to rename, recolor, reorder or delete. Deleting a category removes its entries too.</p>
+            <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">Tap Manage to rename, recolor, reorder or delete. Deleting a category removes its entries too.</p>
           )}
         </aside>
 
@@ -578,7 +576,7 @@ export default function App() {
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
               <h2 className="font-display font-bold text-lg">
-                {selectedCat === 'all' ? '🗂️ All entries' : `${catById[selectedCat]?.icon ?? ''} ${catById[selectedCat]?.name ?? ''}`}
+                {selectedCat === 'all' ? 'All entries' : `${catById[selectedCat]?.icon ?? ''} ${catById[selectedCat]?.name ?? ''}`}
               </h2>
               <p className="text-xs text-slate-500">{filtered.length} shown · tap a row to see details →</p>
             </div>
@@ -591,7 +589,7 @@ export default function App() {
               ['active', `Active · ${statusCounts.active}`],
               ['done', `Done · ${statusCounts.done}`],
               ['all', `All · ${statusCounts.all}`],
-              ['archived', `📦 Archived · ${statusCounts.archived}`],
+              ['archived', `Archived · ${statusCounts.archived}`],
             ]).map(([s, label]) => (
               <button
                 key={s}
@@ -606,13 +604,11 @@ export default function App() {
           {filtered.length === 0 ? (
             statusFilter === 'archived' ? (
               <div className="text-center py-12">
-                <div className="text-5xl">📦</div>
                 <p className="font-bold mt-2">Archive is empty</p>
                 <p className="text-sm text-slate-500">Entries you archive will wait here — restore them or delete forever.</p>
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="text-5xl">🪴</div>
                 <p className="font-bold mt-2">Nothing here yet</p>
                 <p className="text-sm text-slate-500">Entries you add to {viewedCat ? `${viewedCat.icon} ${viewedCat.name}` : 'any category'} will appear here.</p>
                 <button onClick={openNew} className="btn-primary px-5 py-2.5 text-sm mt-4 shadow-lg shadow-violet-200">
@@ -635,7 +631,7 @@ export default function App() {
                     <li key={item.id}>
                       <button onClick={() => pickItem(item.id)} className={`w-full text-left px-3 py-3 grid grid-cols-[28px_1fr_auto] gap-2 items-start transition ${active ? 'bg-violet-50' : 'hover:bg-slate-50'} ${item.status === 'done' ? 'opacity-60' : ''}`}>
                         {item.is_archived ? (
-                          <span className="mt-0.5 w-6 h-6 flex items-center justify-center text-base" title="Archived">📦</span>
+                          <span className="mt-0.5 w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-bold" title="Archived">A</span>
                         ) : (
                           <span onClick={(e) => { e.stopPropagation(); toggleDone(item); }}
                             className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold cursor-pointer ${item.status === 'done' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-emerald-400'}`}>
@@ -647,10 +643,10 @@ export default function App() {
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: catById[item.category_id]?.color ?? '#64748b' }}>
                               {catById[item.category_id]?.icon} {catById[item.category_id]?.name}
                             </span>
-                            {item.is_checklist && <span className="text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">☑ {doneN}/{subs.length}</span>}
-                            {item.link && <span className="text-[10px] font-bold text-sky-700 bg-sky-100 rounded-full px-2 py-0.5">🔗 link</span>}
+                            {item.is_checklist && <span className="text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{doneN}/{subs.length} done</span>}
+                            {item.link && <span className="text-[10px] font-bold text-sky-700 bg-sky-100 rounded-full px-2 py-0.5">link</span>}
                             {item.status === 'done' && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">DONE</span>}
-                            {item.is_archived && <span className="text-[10px] font-bold text-slate-600 bg-slate-200 rounded-full px-2 py-0.5">📦 ARCHIVED</span>}
+                            {item.is_archived && <span className="text-[10px] font-bold text-slate-600 bg-slate-200 rounded-full px-2 py-0.5">ARCHIVED</span>}
                           </span>
                           <span className={`block font-bold text-[15px] leading-snug mt-1 truncate ${item.status === 'done' ? 'line-through' : ''}`}>{item.title}</span>
                           {item.notes && <span className="block text-xs text-slate-500 truncate">{item.notes}</span>}
@@ -673,11 +669,10 @@ export default function App() {
         {/* RIGHT: details only (form moved to popup) */}
         <aside className={`grid gap-4 ${mobileTab === 'details' ? '' : 'hidden lg:grid'}`}>
           <section className="card card-hover p-4">
-            <h2 className="font-display font-bold text-lg">✨ Additional details</h2>
+            <h2 className="font-display font-bold text-lg">Details</h2>
             {!selectedItem ? (
               <div className="mt-2 text-center py-8">
-                <div className="text-4xl opacity-40">👈</div>
-                <p className="text-sm text-slate-400 mt-2">Click any entry to see its details here.</p>
+                <p className="text-sm text-slate-400">Click any entry to see its details here.</p>
               </div>
             ) : (
               <div className="mt-2">
@@ -690,7 +685,7 @@ export default function App() {
                 {selectedItem.notes && <p className="text-sm text-slate-700 whitespace-pre-wrap mt-2 bg-slate-50 rounded-xl p-3">{selectedItem.notes}</p>}
                 {selectedItem.link && (
                   <a href={asLink(selectedItem.link)} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-500 rounded-xl px-3 py-2.5 break-all">
-                    🔗 {selectedItem.link} <span aria-hidden>↗</span>
+                    {selectedItem.link} <span aria-hidden>↗</span>
                   </a>
                 )}
                 {selectedItem.is_checklist && (
@@ -713,7 +708,7 @@ export default function App() {
                 {selectedItem.is_archived ? (
                   <div className="flex gap-2 mt-3 text-sm font-bold">
                     <button onClick={() => restoreItem(selectedItem.id)} className="flex-1 py-2 rounded-xl bg-emerald-500 text-white">↩ Restore</button>
-                    <button onClick={() => deleteForever(selectedItem.id)} className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 border border-red-100">🗑 Delete forever</button>
+                    <button onClick={() => deleteForever(selectedItem.id)} className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 border border-red-100">Delete forever</button>
                   </div>
                 ) : (
                   <div className="flex gap-2 mt-3 text-sm font-bold">
@@ -721,7 +716,7 @@ export default function App() {
                       {selectedItem.status === 'done' ? '↩ Reopen' : '✓ Mark done'}
                     </button>
                     <button onClick={() => startEdit(selectedItem)} className="flex-1 py-2 rounded-xl bg-slate-900 text-white">Edit</button>
-                    <button onClick={() => archiveItem(selectedItem.id)} className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 border border-slate-200">📦 Archive</button>
+                    <button onClick={() => archiveItem(selectedItem.id)} className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 border border-slate-200">Archive</button>
                   </div>
                 )}
               </div>
@@ -756,7 +751,7 @@ export default function App() {
           >
             <div className="sticky top-0 bg-white/95 backdrop-blur px-5 pt-4 pb-3 border-b border-slate-100 rounded-t-3xl">
               <div className="flex items-center justify-between">
-                <h2 className="font-display font-bold text-xl">{editingItem ? '📝 Edit entry' : '＋ New entry'}</h2>
+                <h2 className="font-display font-bold text-xl">{editingItem ? 'Edit entry' : '+ New entry'}</h2>
                 <button onClick={closeModal} aria-label="close" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 font-bold">✕</button>
               </div>
               {/* Destination shown by the Category dropdown below */}
@@ -814,7 +809,7 @@ export default function App() {
               )}
               <div className="flex gap-2 pb-1">
                 <button onClick={saveItem} className="btn-primary flex-1 py-3 text-base shadow-lg shadow-violet-200">
-                  {editingItem ? '💾 Save changes' : form.category_id === '__new__' ? `🚀 Create & add to ${newCat.name.trim() || 'new category'}` : `🚀 Add to ${formCat ? formCat.name : 'category'}`}
+                  {editingItem ? 'Save changes' : form.category_id === '__new__' ? `Create & add to ${newCat.name.trim() || 'new category'}` : `Add to ${formCat ? formCat.name : 'category'}`}
                 </button>
                 <button onClick={closeModal} className="px-5 rounded-xl border font-bold text-sm bg-white">Cancel</button>
               </div>
@@ -827,38 +822,38 @@ export default function App() {
       <nav className={`lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid gap-2 text-xs font-bold ${view === 'home' ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {(view === 'home'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: true },
-              { k: 'todo', label: '✅ To-Do', fn: () => go({ view: 'todo', ttab: 'today' }), active: false },
-              { k: 'bucket', label: '🪣 Bucket', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: false },
-              { k: 'ideas', label: '💡 Ideas', fn: () => go({ view: 'ideas', itab: 'projects' }), active: false },
-              { k: 'growth', label: '📈 Growth', fn: () => go({ view: 'growth', gtab: 'trackers' }), active: false },
+              { k: 'home', label: 'Home', fn: () => go({ view: 'home' }), active: true },
+              { k: 'todo', label: 'To-Do', fn: () => go({ view: 'todo', ttab: 'today' }), active: false },
+              { k: 'bucket', label: 'Bucket', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: false },
+              { k: 'ideas', label: 'Ideas', fn: () => go({ view: 'ideas', itab: 'projects' }), active: false },
+              { k: 'growth', label: 'Growth', fn: () => go({ view: 'growth', gtab: 'trackers' }), active: false },
             ]
           : view === 'ideas'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: false },
-              { k: 'projects', label: '💡 Ventures', fn: () => go({ itab: 'projects' }), active: itab === 'projects' },
-              { k: 'detail', label: '📂 File', fn: () => go({ itab: 'detail' }), active: itab === 'detail' },
-              { k: 'todo', label: '✅ To-Do', fn: () => go({ view: 'todo', ttab: 'today' }), active: false },
+              { k: 'home', label: 'Home', fn: () => go({ view: 'home' }), active: false },
+              { k: 'projects', label: 'Ventures', fn: () => go({ itab: 'projects' }), active: itab === 'projects' },
+              { k: 'detail', label: 'File', fn: () => go({ itab: 'detail' }), active: itab === 'detail' },
+              { k: 'todo', label: 'To-Do', fn: () => go({ view: 'todo', ttab: 'today' }), active: false },
             ]
           : view === 'todo'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: false },
-              { k: 'master', label: '📥 Master', fn: () => go({ ttab: 'master' }), active: ttab === 'master' },
-              { k: 'today', label: '☀️ Today', fn: () => go({ ttab: 'today' }), active: ttab === 'today' },
-              { k: 'history', label: '🕘 History', fn: () => go({ ttab: 'history' }), active: ttab === 'history' },
+              { k: 'home', label: 'Home', fn: () => go({ view: 'home' }), active: false },
+              { k: 'master', label: 'Master', fn: () => go({ ttab: 'master' }), active: ttab === 'master' },
+              { k: 'today', label: 'Today', fn: () => go({ ttab: 'today' }), active: ttab === 'today' },
+              { k: 'history', label: 'History', fn: () => go({ ttab: 'history' }), active: ttab === 'history' },
             ]
           : view === 'growth'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: false },
-              { k: 'trackers', label: '📈 Trackers', fn: () => go({ gtab: 'trackers' }), active: gtab === 'trackers' },
-              { k: 'progress', label: '✅ Progress', fn: () => go({ gtab: 'progress' }), active: gtab === 'progress' },
-              { k: 'bucket', label: '🪣 Bucket', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: false },
+              { k: 'home', label: 'Home', fn: () => go({ view: 'home' }), active: false },
+              { k: 'trackers', label: 'Trackers', fn: () => go({ gtab: 'trackers' }), active: gtab === 'trackers' },
+              { k: 'progress', label: 'Progress', fn: () => go({ gtab: 'progress' }), active: gtab === 'progress' },
+              { k: 'bucket', label: 'Bucket', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: false },
             ]
           : [
-              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: view === 'home' },
-              { k: 'cats', label: '📁 Cats', fn: () => go({ mobileTab: 'cats' }), active: view === 'plan' && mobileTab === 'cats' },
-              { k: 'items', label: '🗂️ Entries', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: view === 'plan' && mobileTab === 'items' },
-              { k: 'details', label: '✨ Details', fn: () => go({ view: 'plan', mobileTab: 'details' }), active: view === 'plan' && mobileTab === 'details' },
+              { k: 'home', label: 'Home', fn: () => go({ view: 'home' }), active: view === 'home' },
+              { k: 'cats', label: 'Lists', fn: () => go({ mobileTab: 'cats' }), active: view === 'plan' && mobileTab === 'cats' },
+              { k: 'items', label: 'Entries', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: view === 'plan' && mobileTab === 'items' },
+              { k: 'details', label: 'Details', fn: () => go({ view: 'plan', mobileTab: 'details' }), active: view === 'plan' && mobileTab === 'details' },
             ]
         ).map((b) => (
           <button key={b.k} onClick={b.fn}

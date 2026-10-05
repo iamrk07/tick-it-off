@@ -215,9 +215,9 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
       <div className="flex gap-1.5">
         <select value={editDraft.repeat} onChange={(e) => setEditDraft({ ...editDraft, repeat: e.target.value })} className="input !py-1.5 !text-xs flex-1" aria-label="repeat">
           <option value="none">Does not repeat</option>
-          <option value="daily">🔁 Repeats daily</option>
-          <option value="weekly">🔁 Repeats weekly</option>
-          <option value="monthly">🔁 Repeats monthly</option>
+          <option value="daily">Repeats daily</option>
+          <option value="weekly">Repeats weekly</option>
+          <option value="monthly">Repeats monthly</option>
         </select>
         <select value={editDraft.project} onChange={(e) => setEditDraft({ ...editDraft, project: e.target.value })} className="input !py-1.5 !text-xs flex-1" aria-label="venture">
           <option value="">No venture</option>
@@ -247,7 +247,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
         <div className="flex-1 min-w-0">
           <p className={`font-semibold text-[15px] leading-snug ${t.status === 'done' ? 'line-through' : ''}`}>
             {t.title}
-            {t.repeat && t.repeat !== 'none' && <span className="ml-1.5 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">🔁 {t.repeat}</span>}
+            {t.repeat && t.repeat !== 'none' && <span className="ml-1.5 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">↻ {t.repeat}</span>}
             {t.project_id && projById[t.project_id] && <span className="ml-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5 whitespace-nowrap text-white" style={{ background: projById[t.project_id].color }}>{projById[t.project_id].icon} {projById[t.project_id].name}</span>}
           </p>
           {t.notes && <p className="text-xs text-slate-500 truncate">{t.notes}</p>}
@@ -272,16 +272,15 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
     <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_320px] items-start">
       {/* LEFT: Master backlog */}
       <section className={`card p-4 ${ttab === 'master' ? '' : 'hidden lg:block'}`}>
-        <h2 className="font-display font-bold text-lg">📥 Master list</h2>
+        <h2 className="font-display font-bold text-lg">Master list</h2>
         <p className="text-xs text-slate-500 mt-0.5">Unscheduled pool — pull items into a day.</p>
         <div className="flex gap-1.5 mt-2">
           <input value={masterDraft} onChange={(e) => setMasterDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (addTask(masterDraft, null), setMasterDraft(''))} placeholder="Park a to-do…" className="input !text-sm" />
           <button onClick={() => { addTask(masterDraft, null); setMasterDraft(''); }} className="px-3.5 rounded-xl bg-slate-900 text-white text-sm font-bold shrink-0">Add</button>
         </div>
         {master.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-4xl">📥</div>
-            <p className="font-bold mt-2 text-sm">Master is empty</p>
+            <div className="text-center py-8">
+              <p className="font-bold mt-2 text-sm">Master is empty</p>
             <p className="text-xs text-slate-500">Park anything here — no date, no pressure.</p>
           </div>
         ) : (
@@ -295,7 +294,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
       {/* MIDDLE: day / week / month views */}
       <section className={`card p-4 ${ttab === 'today' ? '' : 'hidden lg:block'}`}>
         <div className="flex gap-1.5 text-xs font-bold mb-1">
-          {[['day', '☀️ Day'], ['week', '🗓️ Week'], ['month', '📅 Month']].map(([p, label]) => (
+            {[['day', 'Day'], ['week', 'Week'], ['month', 'Month']].map(([p, label]) => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`flex-1 py-1.5 rounded-xl ${period === p ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
               {label}
@@ -309,7 +308,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
             <button onClick={() => setDay(shiftDay(day, -1))} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="previous day">‹</button>
             <div className="text-center min-w-[150px]">
               <h2 className="font-display font-bold text-lg leading-tight">
-                {day === today ? '☀️ Today' : fmtDateLong(day)}
+                {day === today ? 'Today' : fmtDateLong(day)}
               </h2>
               <p className="text-[11px] text-slate-400">{day === today ? fmtDateLong(day) : `${dayDone}/${dayTasks.length} done`}</p>
             </div>
@@ -326,7 +325,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
         {day === today && overdue.length > 0 && dismissed !== today && (
           <div className="mt-3 rounded-2xl bg-amber-50 border border-amber-200 p-3">
             <button onClick={() => setShowOverdue((v) => !v)} className="w-full text-left">
-              <p className="text-sm font-bold">⏰ {plural(overdue.length, 'unfinished item')} from earlier {showOverdue ? '▾' : '▸'}</p>
+              <p className="text-sm font-bold">{plural(overdue.length, 'unfinished item')} from earlier {showOverdue ? '▾' : '▸'}</p>
               <p className="text-xs text-slate-500">Tap to view the list — carry them into today, or leave them as missed.</p>
             </button>
             {showOverdue && (
@@ -365,9 +364,8 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
         </div>
 
         {dayTasks.length === 0 ? (
-          <div className="text-center py-10">
-            <div className="text-5xl">{day === today ? '🪴' : '📭'}</div>
-            <p className="font-bold mt-2">{day === today ? 'A fresh today' : 'Nothing scheduled'}</p>
+            <div className="text-center py-10">
+              <p className="font-bold mt-2">{day === today ? 'A fresh today' : 'Nothing scheduled'}</p>
             <p className="text-sm text-slate-500">{day < today ? 'This day stayed empty.' : 'Pull from Master or add above.'}</p>
           </div>
           ) : (
@@ -381,8 +379,8 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
             <div className="flex items-center justify-between gap-2">
               <button onClick={() => setWeekOff((o) => o - 1)} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="previous week">‹</button>
               <div className="text-center">
-                <h2 className="font-display font-bold text-base leading-tight">
-                  {weekOff === 0 ? '🗓️ This week' : `${fmtDayMon(weekDays[0])} – ${fmtDateLong(weekDays[6])}`}
+                  <h2 className="font-display font-bold text-base leading-tight">
+                  {weekOff === 0 ? 'This week' : `${fmtDayMon(weekDays[0])} – ${fmtDateLong(weekDays[6])}`}
                 </h2>
                 <p className="text-[11px] text-slate-400">{weekDone}/{weekTotal} done</p>
               </div>
@@ -400,7 +398,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
                   <button key={wd} onClick={() => jumpToDay(wd)}
                     className={`text-left rounded-2xl border px-3 py-2 transition ${isT ? 'border-slate-900 shadow bg-slate-900 text-white' : 'border-slate-100 hover:border-slate-300 bg-white'}`}>
                     <span className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-sm">{isT ? '☀️ Today' : weekdayLong(wd)} <span className={`text-[11px] font-semibold ${isT ? 'text-white/70' : 'text-slate-400'}`}>{fmtDayMon(wd)}</span></span>
+                      <span className="font-bold text-sm">{isT ? 'Today' : weekdayLong(wd)} <span className={`text-[11px] font-semibold ${isT ? 'text-white/70' : 'text-slate-400'}`}>{fmtDayMon(wd)}</span></span>
                       <span className={`text-[11px] font-bold ${isT ? 'text-white/80' : 'text-slate-500'}`}>{dn}/{ts.length}</span>
                     </span>
                     <span className={`block h-1 rounded-full mt-1.5 overflow-hidden ${isT ? 'bg-white/20' : 'bg-slate-100'}`}>
@@ -421,7 +419,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
           <div>
             <div className="flex items-center justify-between gap-2">
               <button onClick={() => setMon((c) => { const d = new Date(c.y, c.m - 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; })} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="previous month">‹</button>
-              <h2 className="font-display font-bold text-base">🗓️ {monthLabel(mon.y, mon.m)}</h2>
+              <h2 className="font-display font-bold text-base">{monthLabel(mon.y, mon.m)}</h2>
               <button onClick={() => setMon((c) => { const d = new Date(c.y, c.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; })} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="next month">›</button>
             </div>
             <div className="grid grid-cols-7 gap-1 mt-2 text-center text-[10px] font-bold text-slate-400 uppercase">
@@ -451,14 +449,14 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">Tap any day to open it. Repeating tasks appear automatically after you complete one. 🔁</p>
+            <p className="text-[11px] text-slate-400 mt-2">Tap any day to open it. Repeating tasks extend themselves forward automatically.</p>
           </div>
         )}
       </section>
 
       {/* RIGHT: 30-day history */}
       <aside className={`card p-4 ${ttab === 'history' ? '' : 'hidden lg:block'}`}>
-        <h2 className="font-display font-bold text-lg">🕘 Last 30 days</h2>
+        <h2 className="font-display font-bold text-lg">Last 30 days</h2>
         <p className="text-xs text-slate-500 mt-0.5">Tap a day to see exactly what it held.</p>
         <div className="grid grid-cols-6 gap-1 mt-2">
           {days30.map((d) => {
@@ -478,7 +476,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
           })}
         </div>
         <div className="mt-3">
-          <p className="text-xs font-bold text-slate-500 uppercase">{histDay === today ? '☀️ Today' : fmtDateLong(histDay)} · history is frozen ❄️</p>
+          <p className="text-xs font-bold text-slate-500 uppercase">{histDay === today ? 'Today' : fmtDateLong(histDay)} · history is locked</p>
           {histTasks.length === 0 ? (
             <p className="text-sm text-slate-400 mt-1">Nothing was scheduled.</p>
           ) : (

@@ -58,7 +58,7 @@ function FieldsEditor({ fields, setFields }) {
           {fields.map((f) => (
             <li key={f.key} className="flex items-center gap-2 text-xs bg-white border rounded-xl px-2.5 py-1.5">
               <span className="font-bold flex-1">{f.label}</span>
-              <span className="text-slate-400 font-semibold">{f.type === 'number' ? '🔢 number' : '🔤 text'}</span>
+              <span className="text-slate-400 font-semibold">{f.type === 'number' ? 'number' : 'text'}</span>
               <button onClick={() => setFields(fields.filter((x) => x.key !== f.key))} className="text-slate-300 hover:text-red-500 font-bold px-2 py-0.5" aria-label={`remove ${f.label}`}>✕</button>
             </li>
           ))}
@@ -74,9 +74,9 @@ function FieldsEditor({ fields, setFields }) {
       </div>
       <div className="flex gap-1.5 flex-wrap text-[11px] font-bold">
         <span className="text-slate-400 self-center">Quick sets:</span>
-        <button onClick={() => addPreset(PRESETS.gym)} className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200">🏋️ Gym</button>
-        <button onClick={() => addPreset(PRESETS.reading)} className="px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-200">📖 Reading</button>
-        <button onClick={() => addPreset(PRESETS.mindfulness)} className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200">🧘 Calm</button>
+        <button onClick={() => addPreset(PRESETS.gym)} className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200">Gym</button>
+        <button onClick={() => addPreset(PRESETS.reading)} className="px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-200">Reading</button>
+        <button onClick={() => addPreset(PRESETS.mindfulness)} className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200">Calm</button>
       </div>
     </div>
   );
@@ -291,7 +291,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       {/* LEFT: trackers */}
       <section className={`card p-4 ${gtab === 'trackers' ? '' : 'hidden lg:block'}`}>
         <div className="flex items-center justify-between">
-          <h2 className="font-display font-bold text-lg">📈 Growth</h2>
+          <h2 className="font-display font-bold text-lg">Growth</h2>
           <button onClick={() => { setDraft(blankTracker()); setShowNew((v) => !v); }} className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-900 text-white">
             {showNew ? 'Close' : '＋ New'}
           </button>
@@ -322,11 +322,10 @@ export default function Growth({ data, setData, gtab, setGtab }) {
         <div className="mt-3 grid gap-1.5">
           {liveTrackers.length === 0 && !showNew && (
             <div className="text-center py-8">
-              <div className="text-4xl">🌱</div>
               <p className="font-bold mt-2 text-sm">No trackers yet</p>
               <p className="text-xs text-slate-500">Track gym, books, calm — hit ＋ New.</p>
               <button onClick={restoreStarters} className="mt-3 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">
-                🌱 Restore starter trackers
+                Restore starter trackers
               </button>
             </div>
           )}
@@ -341,7 +340,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                   <span className="w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${t.color}1e` }}>{t.icon}</span>
                   <span className="flex-1 min-w-0">
                     <span className="block font-bold text-sm truncate">{t.name}</span>
-                    <span className="block text-[11px] text-slate-400">🔥 {plural(st.streak, 'day')} streak · {plural(st.sessions, 'log')}</span>
+                    <span className="block text-[11px] text-slate-400">{plural(st.streak, 'day')} streak · {plural(st.sessions, 'log')}</span>
                   </span>
                 </span>
                 <span className="block h-1.5 rounded-full bg-slate-100 mt-2 overflow-hidden">
@@ -362,7 +361,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
         </div>
         {archivedTrackers.length > 0 && (
           <div className="mt-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase mb-1.5">📦 Archived ({archivedTrackers.length})</p>
+            <p className="text-[11px] font-bold text-slate-400 uppercase mb-1.5">Archived ({archivedTrackers.length})</p>
             <div className="grid gap-1.5">
               {archivedTrackers.map((t) => (
                 <button key={t.id} onClick={() => pick(t.id)}
@@ -380,9 +379,8 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       {/* RIGHT: detail + log + calendar + record table */}
       <div className={`grid gap-4 ${gtab === 'progress' ? '' : 'hidden lg:grid'}`}>
         {!sel ? (
-          <section className="card p-8 text-center">
-            <div className="text-5xl">📈</div>
-            <p className="font-bold mt-2">Pick a tracker to see progress</p>
+            <section className="card p-8 text-center">
+              <p className="font-bold mt-2">Pick a tracker to see progress</p>
             <p className="text-sm text-slate-500">Or create one with ＋ New.</p>
           </section>
         ) : sel.is_archived ? (
@@ -391,13 +389,13 @@ export default function Growth({ data, setData, gtab, setGtab }) {
               <span className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 opacity-60" style={{ background: `${sel.color}1e` }}>{sel.icon}</span>
               <div className="min-w-0 flex-1">
                 <h2 className="font-display font-bold text-xl truncate">{sel.name}</h2>
-                <p className="text-xs text-slate-500">📦 Archived · {plural(selLogs.length, 'log')} kept safely</p>
+                <p className="text-xs text-slate-500">Archived · {plural(selLogs.length, 'log')} kept safely</p>
               </div>
             </div>
             <p className="text-sm text-slate-500 mt-2">Restore it to keep logging, or delete it forever with all its history.</p>
             <div className="flex gap-2 mt-3 text-sm font-bold">
               <button onClick={() => restoreTracker(sel.id)} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white">↩ Restore</button>
-              <button onClick={() => deleteTrackerForever(sel.id)} className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100">🗑 Delete forever</button>
+              <button onClick={() => deleteTrackerForever(sel.id)} className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100">Delete forever</button>
             </div>
           </section>
         ) : (
@@ -413,7 +411,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                 </div>
                 <div className="flex gap-1.5 shrink-0 text-xs font-bold">
                   <button onClick={startEdit} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">Edit</button>
-                  <button onClick={() => archiveTracker(sel.id)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">📦 Archive</button>
+                  <button onClick={() => archiveTracker(sel.id)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">Archive</button>
                 </div>
               </div>
 
@@ -444,7 +442,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                 <>
                   <div className="grid grid-cols-3 gap-2 mt-3 text-center">
                     <div className="rounded-2xl bg-orange-50 border border-orange-100 p-3">
-                      <div className="text-2xl font-extrabold">🔥{selStats?.streak ?? 0}</div>
+                      <div className="text-2xl font-extrabold">{selStats?.streak ?? 0}</div>
                       <div className="text-[11px] font-bold text-slate-500 uppercase">day streak</div>
                     </div>
                     <div className="rounded-2xl bg-violet-50 border border-violet-100 p-3">
@@ -472,7 +470,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
             </section>
 
             <section id="growth-log-card" className="card p-4 scroll-mt-24">
-              <h3 className="font-display font-bold text-base">✅ Log activity</h3>
+              <h3 className="font-display font-bold text-base">Log activity</h3>
               <button onClick={quickLog} className="btn-primary w-full py-2.5 text-sm mt-2 shadow-lg shadow-violet-200">
                 ＋ Log today
               </button>
@@ -507,7 +505,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
 
             <section className="card p-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-base">🗓️ {monthLabel(cal.y, cal.m)}</h3>
+                <h3 className="font-display font-bold text-base">{monthLabel(cal.y, cal.m)}</h3>
                 <div className="flex gap-1.5 text-xs font-bold">
                   <button onClick={() => shiftMonth(-1)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200" aria-label="previous month">‹ Prev</button>
                   <button onClick={() => { const d = new Date(); setCal({ y: d.getFullYear(), m: d.getMonth() }); }} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">Today</button>
@@ -549,9 +547,9 @@ export default function Growth({ data, setData, gtab, setGtab }) {
             </section>
 
             <section className="card p-4 overflow-hidden">
-              <h3 className="font-display font-bold text-base">🧾 Record table</h3>
+              <h3 className="font-display font-bold text-base">Records</h3>
               {selLogs.length === 0 ? (
-                <p className="text-sm text-slate-500 mt-2">Nothing logged yet — your day-by-day record (weight, exercises, book, pages…) will appear here. 💪</p>
+                <p className="text-sm text-slate-500 mt-2">Nothing logged yet — your day-by-day record (weight, exercises, book, pages…) will appear here.</p>
               ) : (
                 <div className="mt-2 -mx-4 px-4 overflow-x-auto nice-scroll">
                   <table className="w-full text-sm whitespace-nowrap">
