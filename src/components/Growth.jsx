@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { uid, now } from '../lib/store.js';
+import { uid, now, defaultTrackers } from '../lib/store.js';
 import { todayLocal, calcStreak, mondayStr, monthGrid, monthLabel, fmtDateLong, plural } from '../lib/growth.js';
 
 const COLORS = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
@@ -101,14 +101,16 @@ export default function Growth({ data, setData, gtab, setGtab }) {
     return { y: d.getFullYear(), m: d.getMonth() };
   });
 
-  const sel = trackers.find((t) => t.id === (selId ?? trackers[0]?.id)) ?? null;
+  const liveTrackers = useMemo(() => trackers.filter((t) => !t.is_archived), [trackers]);
+  const archivedTrackers = useMemo(() => trackers.filter((t) => t.is_archived), [trackers]);
+  const sel = trackers.find((t) => t.id === (selId ?? liveTrackers[0]?.id)) ?? null;
   const selFields = sel?.fields || [];
 
   // Per-tracker mini stats for the list
   const statMap = useMemo(() => {
     const m = {};
     const monday = mondayStr();
-    trackers.forEach((t) => {
+    liveTrackers.forEach((t) => {
       const ls = logs.filter((l) => l.tracker_id === t.id);
       const byDate = {};
       ls.forEach((l) => {
@@ -120,7 +122,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       m[t.id] = { streak: calcStreak(new Set(Object.keys(byDate))), week, sessions: ls.length };
     });
     return m;
-  }, [trackers, logs]);
+  }, [liveTrackers, logs]);
 
   // Selected tracker logs + calendar lookup
   const selLogs = useMemo(
@@ -150,6 +152,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
       unit: draft.unit.trim() || 'times',
       target_per_week: draft.target === '' ? null : Number(draft.target),
       fields: draft.fields || [],
+      is_archived: false, archived_at: null,
       sort_order: max + 1, created_at: now(),
     };
     setData((d) => ({ ...d, trackers: [...(d.trackers || []), row] }));
@@ -171,14 +174,42 @@ export default function Growth({ data, setData, gtab, setGtab }) {
     setEditing(false);
   };
 
-  const deleteTracker = (id) => {
-    if (!confirm('Delete this tracker and all its logged activity?')) return;
+  const archiveTracker = (id) => {
+    const t = now();
+    setData((d) => ({
+      ...d,
+      trackers: d.trackers.map((x) => (x.id === id ? { ...x, is_archived: true, archived_at: t } : x)),
+    }));
+    if (selId === id) setSelId(null);
+  };
+
+  const restoreTracker = (id) => {
+    setData((d) => ({
+      ...d,
+      trackers: d.trackers.map((x) => (x.id === id ? { ...x, is_archived: false, archived_at: null } : x)),
+    }));
+  };
+
+  const deleteTrackerForever = (id) => {
+    if (!confirm('Permanently delete this tracker and all its logged activity? This cannot be undone.')) return;
     setData((d) => ({
       ...d,
       trackers: d.trackers.filter((t) => t.id !== id),
       tracker_logs: d.tracker_logs.filter((l) => l.tracker_id !== id),
     }));
     if (selId === id) setSelId(null);
+  };
+
+  // One-tap recovery: bring back starter trackers missing by name (Gym, Reading…)
+  const restoreStarters = () => {
+    const have = new Set([...(data.trackers || [])].map((t) => t.name.trim().toLowerCase()));
+    const max = trackers.reduce((m, t) => Math.max(m, t.sort_order), -1);
+    const fresh = defaultTrackers(me).filter((t) => !have.has(t.name.trim().toLowerCase()));
+    if (!fresh.length) return alert('Starter trackers already exist.');
+    const placed = fresh.map((t, i) => ({ ...t, sort_order: max + 1 + i }));
+    setData((d) => ({ ...d, trackers: [...(d.trackers || []), ...placed] }));
+    setSelId(placed[0].id);
+    setGtab('progress');
   };
 
   const buildExtra = () => {
@@ -289,14 +320,17 @@ export default function Growth({ data, setData, gtab, setGtab }) {
         )}
 
         <div className="mt-3 grid gap-1.5">
-          {trackers.length === 0 && !showNew && (
+          {liveTrackers.length === 0 && !showNew && (
             <div className="text-center py-8">
               <div className="text-4xl">🌱</div>
               <p className="font-bold mt-2 text-sm">No trackers yet</p>
               <p className="text-xs text-slate-500">Track gym, books, calm — hit ＋ New.</p>
+              <button onClick={restoreStarters} className="mt-3 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">
+                🌱 Restore starter trackers
+              </button>
             </div>
           )}
-          {trackers.map((t) => {
+          {liveTrackers.map((t) => {
             const st = statMap[t.id] ?? { streak: 0, week: 0, sessions: 0 };
             const active = sel?.id === t.id;
             return (
@@ -326,6 +360,21 @@ export default function Growth({ data, setData, gtab, setGtab }) {
             );
           })}
         </div>
+        {archivedTrackers.length > 0 && (
+          <div className="mt-3">
+            <p className="text-[11px] font-bold text-slate-400 uppercase mb-1.5">📦 Archived ({archivedTrackers.length})</p>
+            <div className="grid gap-1.5">
+              {archivedTrackers.map((t) => (
+                <button key={t.id} onClick={() => pick(t.id)}
+                  className={`w-full text-left rounded-2xl border border-slate-100 px-3 py-2 flex items-center gap-2 opacity-60 hover:opacity-100 ${sel?.id === t.id ? 'bg-slate-100' : ''}`}>
+                  <span className="text-base">{t.icon}</span>
+                  <span className="flex-1 min-w-0 text-sm font-bold truncate">{t.name}</span>
+                  <span className="text-[10px] font-bold text-slate-500">ARCHIVED</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* RIGHT: detail + log + calendar + record table */}
@@ -335,6 +384,21 @@ export default function Growth({ data, setData, gtab, setGtab }) {
             <div className="text-5xl">📈</div>
             <p className="font-bold mt-2">Pick a tracker to see progress</p>
             <p className="text-sm text-slate-500">Or create one with ＋ New.</p>
+          </section>
+        ) : sel.is_archived ? (
+          <section className="card p-4">
+            <div className="flex items-center gap-2.5">
+              <span className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 opacity-60" style={{ background: `${sel.color}1e` }}>{sel.icon}</span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-display font-bold text-xl truncate">{sel.name}</h2>
+                <p className="text-xs text-slate-500">📦 Archived · {plural(selLogs.length, 'log')} kept safely</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-500 mt-2">Restore it to keep logging, or delete it forever with all its history.</p>
+            <div className="flex gap-2 mt-3 text-sm font-bold">
+              <button onClick={() => restoreTracker(sel.id)} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white">↩ Restore</button>
+              <button onClick={() => deleteTrackerForever(sel.id)} className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100">🗑 Delete forever</button>
+            </div>
           </section>
         ) : (
           <>
@@ -349,7 +413,7 @@ export default function Growth({ data, setData, gtab, setGtab }) {
                 </div>
                 <div className="flex gap-1.5 shrink-0 text-xs font-bold">
                   <button onClick={startEdit} className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200">Edit</button>
-                  <button onClick={() => deleteTracker(sel.id)} className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100">Del</button>
+                  <button onClick={() => archiveTracker(sel.id)} className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">📦 Archive</button>
                 </div>
               </div>
 

@@ -112,6 +112,7 @@ export default function App() {
   const bestStreak = useMemo(() => {
     let best = 0;
     (data.trackers || []).forEach((t) => {
+      if (t.is_archived) return;
       const dates = new Set((data.tracker_logs || []).filter((l) => l.tracker_id === t.id).map((l) => l.log_date));
       best = Math.max(best, calcStreak(dates));
     });
@@ -373,7 +374,7 @@ export default function App() {
                   </>
                 )}
                 {view === 'growth' && (
-                  <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {(data.trackers || []).length} trackers · 🔥 {bestStreak} best streak</span>
+                  <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')} · 🔥 {bestStreak} best streak</span>
                 )}
               </div>
             </div>
@@ -436,7 +437,7 @@ export default function App() {
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
             <span className="bg-white/20 rounded-full px-3 py-1">🔥 {bestStreak} best streak</span>
-            <span className="bg-white/20 rounded-full px-3 py-1">📈 {plural((data.trackers || []).length, 'tracker')}</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">📈 {plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')}</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>

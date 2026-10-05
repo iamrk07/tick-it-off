@@ -36,9 +36,9 @@ export function defaultCategories(userId) {
 
 export function defaultTrackers(userId) {
   return [
-    { id: uid(), user_id: userId, name: 'Gym', icon: '🏋️', color: '#10b981', unit: 'workouts', target_per_week: 4, sort_order: 0, created_at: now(),
+    { id: uid(), user_id: userId, name: 'Gym', icon: '🏋️', color: '#10b981', unit: 'workouts', target_per_week: 4, sort_order: 0, created_at: now(), is_archived: false, archived_at: null,
       fields: [{ key: 'weight', label: 'Weight (kg)', type: 'number' }, { key: 'exercises', label: 'Exercises', type: 'text' }] },
-    { id: uid(), user_id: userId, name: 'Reading', icon: '📖', color: '#8b5cf6', unit: 'pages', target_per_week: 100, sort_order: 1, created_at: now(),
+    { id: uid(), user_id: userId, name: 'Reading', icon: '📖', color: '#8b5cf6', unit: 'pages', target_per_week: 100, sort_order: 1, created_at: now(), is_archived: false, archived_at: null,
       fields: [{ key: 'book', label: 'Book', type: 'text' }, { key: 'pages', label: 'Pages', type: 'number' }, { key: 'minutes', label: 'Minutes', type: 'number' }] },
   ];
 }
@@ -68,6 +68,8 @@ function migrate(raw) {
   // Custom-column defaults for data created before custom fields existed
   d.trackers.forEach((t) => {
     if (!Array.isArray(t.fields)) t.fields = [];
+    if (t.is_archived === undefined) t.is_archived = false;
+    if (t.archived_at === undefined) t.archived_at = null;
   });
   d.tracker_logs.forEach((l) => {
     if (!l.extra || typeof l.extra !== 'object') l.extra = {};
@@ -197,6 +199,7 @@ export async function pushCloud(userId, data) {
     id: t.id, user_id: userId, name: t.name, icon: t.icon, color: t.color,
     unit: t.unit ?? 'times', target_per_week: t.target_per_week ?? null,
     fields: t.fields ?? [],
+    is_archived: !!t.is_archived, archived_at: t.archived_at ?? null,
     sort_order: t.sort_order, created_at: t.created_at,
   }));
   const dbLogs = (data.tracker_logs || []).map((l) => ({

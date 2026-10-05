@@ -82,7 +82,9 @@ create table if not exists trackers (
   target_per_week int,
   sort_order int default 0,
   created_at timestamptz default now(),
-  fields jsonb default '[]'
+  fields jsonb default '[]',
+  is_archived boolean default false,
+  archived_at timestamptz
 );
 
 create table if not exists tracker_logs (
@@ -116,3 +118,7 @@ grant all on public.tracker_logs to authenticated;
 -- Custom columns upgrade (for DBs created before fields/extra existed)
 alter table trackers add column if not exists fields jsonb default '[]';
 alter table tracker_logs add column if not exists extra jsonb default '{}';
+
+-- Tracker archive upgrade (soft delete, like entries)
+alter table trackers add column if not exists is_archived boolean default false;
+alter table trackers add column if not exists archived_at timestamptz;
