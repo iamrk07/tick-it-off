@@ -133,6 +133,7 @@ create table if not exists tasks (
   scheduled_date date,
   repeat text default 'none',
   project_id uuid,
+  series_id uuid,
   status text default 'active' check (status in ('active', 'done')),
   sort_order int default 0,
   created_at timestamptz default now(),
@@ -148,3 +149,6 @@ create policy "own tasks" on tasks
 
 create index if not exists idx_tasks_user on tasks(user_id, scheduled_date);
 grant all on public.tasks to authenticated;
+
+-- Repeating-series linkage (for DBs created before series_id existed)
+alter table tasks add column if not exists series_id uuid;

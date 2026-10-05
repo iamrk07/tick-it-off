@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { uid, now } from '../lib/store.js';
 import { todayLocal, fmtDay, fmtDateLong, fmtDayMon, plural, monthGrid, monthLabel, mondayStr } from '../lib/growth.js';
 
@@ -121,27 +121,56 @@ export default function Todo({ data, setData, ttab, setTtab }) {
   const toggleTask = (t) => {
     const tnow = now();
     const done = t.status !== 'done';
-    // Repeating tasks roll forward: completing spawns the next instance
-    let rolled = null;
-    if (done && t.repeat && t.repeat !== 'none' && t.scheduled_date) {
-      const nd = nextRepeatDate(t.scheduled_date, t.repeat);
-      if (nd) {
-        rolled = {
-          ...t, id: uid(), scheduled_date: nd, status: 'active',
-          completed_at: null, created_at: tnow, updated_at: tnow,
-        };
-      }
-    }
     setData((d) => ({
       ...d,
-      tasks: [
-        ...d.tasks.map((x) => (x.id === t.id
-          ? { ...x, status: done ? 'done' : 'active', completed_at: done ? tnow : null, updated_at: tnow }
-          : x)),
-        ...(rolled ? [rolled] : []),
-      ],
+      tasks: d.tasks.map((x) => (x.id === t.id
+        ? { ...x, status: done ? 'done' : 'active', completed_at: done ? tnow : null, updated_at: tnow }
+        : x)),
     }));
   };
+
+  // Forward-plan repeating series: keep the tail filled to the horizon.
+  // Only extends the tail (never refills deleted middle copies), so it converges.
+  useEffect(() => {
+    if (!tasks.length) return;
+    const groups = {};
+    tasks.forEach((t) => {
+      if (!t.repeat || t.repeat === 'none' || !t.scheduled_date) return;
+      const k = t.series_id || `t:${(t.title || '').trim().toLowerCase()}|${t.repeat}`;
+      const g = groups[k] || (groups[k] = { repeat: t.repeat, title: t.title, key: t.series_id || t.id, max: '' });
+      if (t.scheduled_date > g.max) {
+        g.max = t.scheduled_date;
+        g.key = t.series_id || t.id;
+      }
+    });
+    const horizonDays = { daily: 30, weekly: 84, monthly: 180 };
+    const have = new Set(tasks.map((t) => `${(t.title || '').trim().toLowerCase()}|${t.repeat}|${t.scheduled_date}`));
+    const add = [];
+    Object.values(groups).forEach((g) => {
+      const h = horizonDays[g.repeat];
+      if (!h) return;
+      let cursor = g.max < today ? shiftDay(today, -1) : g.max;
+      const end = shiftDay(today, h);
+      const src = tasks.find((t) => (t.series_id || t.id) === g.key) || {};
+      let guard = 0;
+      while (guard++ < 200) {
+        const nd = nextRepeatDate(cursor, g.repeat);
+        if (!nd || nd <= cursor || nd > end) break;
+        cursor = nd;
+        const sig = `${(g.title || '').trim().toLowerCase()}|${g.repeat}|${nd}`;
+        if (have.has(sig)) continue;
+        have.add(sig);
+        add.push({
+          id: uid(), user_id: me, title: g.title, notes: '',
+          scheduled_date: nd, repeat: g.repeat, project_id: src.project_id ?? null,
+          status: 'active', sort_order: 0,
+          created_at: now(), updated_at: now(), completed_at: null, series_id: g.key,
+        });
+      }
+    });
+    if (add.length) setData((d) => ({ ...d, tasks: [...(d.tasks || []), ...add] }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks]);
 
   const deleteTask = (id) => {
     if (!confirm('Delete this to-do?')) return;

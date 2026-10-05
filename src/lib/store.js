@@ -241,7 +241,7 @@ export async function pushCloud(userId, data) {
   const dbTasks = (data.tasks || []).map((t) => ({
     id: t.id, user_id: userId, title: t.title, notes: t.notes ?? '',
     scheduled_date: t.scheduled_date ?? null, repeat: t.repeat ?? 'none',
-    project_id: t.project_id ?? null, status: t.status,
+    project_id: t.project_id ?? null, series_id: t.series_id ?? null, status: t.status,
     sort_order: t.sort_order ?? 0, created_at: t.created_at, updated_at: t.updated_at,
     completed_at: t.completed_at ?? null,
   }));
