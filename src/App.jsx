@@ -468,7 +468,7 @@ export default function App() {
           style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1 60%, #8b5cf6)' }}
         >
             <div>
-              <div className="text-5xl font-display font-bold text-white/90">T</div>
+              <div className="text-5xl">✅</div>
               <h2 className="font-display text-2xl font-bold mt-3">To-Do</h2>
             <p className="text-white/80 text-sm mt-1">Master backlog, today's plan & 30-day history.</p>
           </div>
@@ -484,7 +484,7 @@ export default function App() {
           style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed 55%, #db2777)' }}
         >
             <div>
-              <div className="text-5xl font-display font-bold text-white/90">B</div>
+              <div className="text-5xl">🪣</div>
               <h2 className="font-display text-2xl font-bold mt-3">Bucket List</h2>
             <p className="text-white/80 text-sm mt-1">Dreams, places, books & things to do one day.</p>
           </div>
@@ -500,7 +500,7 @@ export default function App() {
           style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316 55%, #ef4444)' }}
         >
             <div>
-              <div className="text-5xl font-display font-bold text-white/90">I</div>
+              <div className="text-5xl">💡</div>
               <h2 className="font-display text-2xl font-bold mt-3">Ideas</h2>
             <p className="text-white/80 text-sm mt-1">Ventures & projects with status, notes & to-dos.</p>
           </div>
@@ -516,7 +516,7 @@ export default function App() {
           style={{ background: 'linear-gradient(135deg, #059669, #0d9488 55%, #0284c7)' }}
         >
             <div>
-              <div className="text-5xl font-display font-bold text-white/90">G</div>
+              <div className="text-5xl">📈</div>
               <h2 className="font-display text-2xl font-bold mt-3">Growth</h2>
             <p className="text-white/80 text-sm mt-1">Track gym, reading, calm… streaks, tables & calendars.</p>
           </div>
