@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { uid, now } from '../lib/store.js';
-import { todayLocal, fmtDay, fmtDateLong, fmtDayMon, plural } from '../lib/growth.js';
+import { todayLocal, fmtDay, fmtDateLong, fmtDayMon, plural, monthGrid, monthLabel, mondayStr } from '../lib/growth.js';
 
 const shiftDay = (dateStr, dir) => {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -18,6 +18,26 @@ const last30 = () => {
 
 const byCreated = (a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '');
 
+// Next occurrence for a repeat rule (daily / weekly / monthly)
+const nextRepeatDate = (dateStr, repeat) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (repeat === 'daily') dt.setDate(dt.getDate() + 1);
+  else if (repeat === 'weekly') dt.setDate(dt.getDate() + 7);
+  else if (repeat === 'monthly') dt.setMonth(dt.getMonth() + 1);
+  else return null;
+  return fmtDay(dt);
+};
+
+const weekdayLong = (dateStr) => {
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'long' });
+  } catch {
+    return dateStr;
+  }
+};
+
 // To-Do: Master backlog (unscheduled) + day view + 30-day history.
 // Props: data, setData, ttab/setTtab (mobile panes: master | today | history)
 export default function Todo({ data, setData, ttab, setTtab }) {
@@ -31,8 +51,14 @@ export default function Todo({ data, setData, ttab, setTtab }) {
   const [dayDraft, setDayDraft] = useState('');
   const [dismissed, setDismissed] = useState(''); // date for which the overdue nudge was left alone
   const [showOverdue, setShowOverdue] = useState(false); // expand the unfinished-items list
+  const [period, setPeriod] = useState('day'); // day | week | month (middle pane)
+  const [weekOff, setWeekOff] = useState(0); // 0 = this week
+  const [mon, setMon] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ title: '', notes: '' });
+  const [editDraft, setEditDraft] = useState({ title: '', notes: '', repeat: 'none' });
 
   const master = useMemo(
     () => tasks.filter((t) => !t.scheduled_date && t.status === 'active').sort(byCreated),
@@ -63,6 +89,20 @@ export default function Todo({ data, setData, ttab, setTtab }) {
     [tasks, histDay]
   );
 
+  // Week view: Monday–Sunday of the viewed week
+  const weekMonday = shiftDay(mondayStr(), weekOff * 7);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => shiftDay(weekMonday, i)), [weekMonday]);
+  const weekDone = weekDays.reduce((s, d) => s + tasks.filter((t) => t.scheduled_date === d && t.status === 'done').length, 0);
+  const weekTotal = weekDays.reduce((s, d) => s + tasks.filter((t) => t.scheduled_date === d).length, 0);
+
+  // Month view grid
+  const monthWeeks = useMemo(() => monthGrid(mon.y, mon.m), [mon]);
+
+  const jumpToDay = (date) => {
+    setDay(date);
+    setPeriod('day');
+  };
+
   // ---------- actions ----------
   const addTask = (title, date) => {
     if (!title.trim()) return;
@@ -81,11 +121,25 @@ export default function Todo({ data, setData, ttab, setTtab }) {
   const toggleTask = (t) => {
     const tnow = now();
     const done = t.status !== 'done';
+    // Repeating tasks roll forward: completing spawns the next instance
+    let rolled = null;
+    if (done && t.repeat && t.repeat !== 'none' && t.scheduled_date) {
+      const nd = nextRepeatDate(t.scheduled_date, t.repeat);
+      if (nd) {
+        rolled = {
+          ...t, id: uid(), scheduled_date: nd, status: 'active',
+          completed_at: null, created_at: tnow, updated_at: tnow,
+        };
+      }
+    }
     setData((d) => ({
       ...d,
-      tasks: d.tasks.map((x) => (x.id === t.id
-        ? { ...x, status: done ? 'done' : 'active', completed_at: done ? tnow : null, updated_at: tnow }
-        : x)),
+      tasks: [
+        ...d.tasks.map((x) => (x.id === t.id
+          ? { ...x, status: done ? 'done' : 'active', completed_at: done ? tnow : null, updated_at: tnow }
+          : x)),
+        ...(rolled ? [rolled] : []),
+      ],
     }));
   };
 
@@ -113,7 +167,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
 
   const startEdit = (t) => {
     setEditingId(t.id);
-    setEditDraft({ title: t.title, notes: t.notes ?? '' });
+    setEditDraft({ title: t.title, notes: t.notes ?? '', repeat: t.repeat ?? 'none' });
   };
 
   const saveEdit = () => {
@@ -121,7 +175,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
     setData((d) => ({
       ...d,
       tasks: d.tasks.map((x) => (x.id === editingId
-        ? { ...x, title: editDraft.title.trim(), notes: editDraft.notes, updated_at: now() }
+        ? { ...x, title: editDraft.title.trim(), notes: editDraft.notes, repeat: editDraft.repeat ?? 'none', updated_at: now() }
         : x)),
     }));
     setEditingId(null);
@@ -131,6 +185,14 @@ export default function Todo({ data, setData, ttab, setTtab }) {
     <div className="flex-1 grid gap-1.5">
       <input value={editDraft.title} onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} className="input !py-1.5 !text-sm font-semibold" autoFocus />
       <input value={editDraft.notes} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} placeholder="Note (optional)…" className="input !py-1.5 !text-xs" />
+      <div className="flex gap-1.5">
+        <select value={editDraft.repeat} onChange={(e) => setEditDraft({ ...editDraft, repeat: e.target.value })} className="input !py-1.5 !text-xs flex-1" aria-label="repeat">
+          <option value="none">Does not repeat</option>
+          <option value="daily">🔁 Repeats daily</option>
+          <option value="weekly">🔁 Repeats weekly</option>
+          <option value="monthly">🔁 Repeats monthly</option>
+        </select>
+      </div>
       <div className="flex gap-1.5">
         <button onClick={saveEdit} className="px-3 py-1 rounded-lg bg-slate-900 text-white text-xs font-bold">Save</button>
         <button onClick={() => setEditingId(null)} className="px-3 py-1 rounded-lg border text-xs font-bold">Cancel</button>
@@ -152,7 +214,10 @@ export default function Todo({ data, setData, ttab, setTtab }) {
       )}
       {editingId === t.id && !opts.readonly ? rowEditor(t) : (
         <div className="flex-1 min-w-0">
-          <p className={`font-semibold text-[15px] leading-snug ${t.status === 'done' ? 'line-through' : ''}`}>{t.title}</p>
+          <p className={`font-semibold text-[15px] leading-snug ${t.status === 'done' ? 'line-through' : ''}`}>
+            {t.title}
+            {t.repeat && t.repeat !== 'none' && <span className="ml-1.5 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">🔁 {t.repeat}</span>}
+          </p>
           {t.notes && <p className="text-xs text-slate-500 truncate">{t.notes}</p>}
         </div>
       )}
@@ -195,8 +260,18 @@ export default function Todo({ data, setData, ttab, setTtab }) {
         <p className="text-[11px] text-slate-400 mt-2">{plural(master.length, 'item')} waiting · done ones disappear ✓</p>
       </section>
 
-      {/* MIDDLE: day view */}
+      {/* MIDDLE: day / week / month views */}
       <section className={`card p-4 ${ttab === 'today' ? '' : 'hidden lg:block'}`}>
+        <div className="flex gap-1.5 text-xs font-bold mb-1">
+          {[['day', '☀️ Day'], ['week', '🗓️ Week'], ['month', '📅 Month']].map(([p, label]) => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`flex-1 py-1.5 rounded-xl ${period === p ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {period === 'day' ? (
+        <>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <button onClick={() => setDay(shiftDay(day, -1))} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="previous day">‹</button>
@@ -263,10 +338,89 @@ export default function Todo({ data, setData, ttab, setTtab }) {
             <p className="font-bold mt-2">{day === today ? 'A fresh today' : 'Nothing scheduled'}</p>
             <p className="text-sm text-slate-500">{day < today ? 'This day stayed empty.' : 'Pull from Master or add above.'}</p>
           </div>
+          ) : (
+            <ul className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden bg-white">
+              {dayTasks.map((t) => taskRow(t, { toMaster: true }))}
+            </ul>
+          )}
+        </>
+        ) : period === 'week' ? (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <button onClick={() => setWeekOff((o) => o - 1)} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="previous week">‹</button>
+              <div className="text-center">
+                <h2 className="font-display font-bold text-base leading-tight">
+                  {weekOff === 0 ? '🗓️ This week' : `${fmtDayMon(weekDays[0])} – ${fmtDateLong(weekDays[6])}`}
+                </h2>
+                <p className="text-[11px] text-slate-400">{weekDone}/{weekTotal} done</p>
+              </div>
+              <button onClick={() => setWeekOff((o) => o + 1)} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="next week">›</button>
+            </div>
+            {weekOff !== 0 && (
+              <button onClick={() => setWeekOff(0)} className="mt-2 w-full py-1.5 rounded-xl bg-slate-100 text-xs font-bold">Back to this week</button>
+            )}
+            <div className="grid gap-1.5 mt-2">
+              {weekDays.map((wd) => {
+                const ts = tasks.filter((t) => t.scheduled_date === wd).sort(byCreated);
+                const dn = ts.filter((t) => t.status === 'done').length;
+                const isT = wd === today;
+                return (
+                  <button key={wd} onClick={() => jumpToDay(wd)}
+                    className={`text-left rounded-2xl border px-3 py-2 transition ${isT ? 'border-slate-900 shadow bg-slate-900 text-white' : 'border-slate-100 hover:border-slate-300 bg-white'}`}>
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-sm">{isT ? '☀️ Today' : weekdayLong(wd)} <span className={`text-[11px] font-semibold ${isT ? 'text-white/70' : 'text-slate-400'}`}>{fmtDayMon(wd)}</span></span>
+                      <span className={`text-[11px] font-bold ${isT ? 'text-white/80' : 'text-slate-500'}`}>{dn}/{ts.length}</span>
+                    </span>
+                    <span className={`block h-1 rounded-full mt-1.5 overflow-hidden ${isT ? 'bg-white/20' : 'bg-slate-100'}`}>
+                      <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${ts.length ? (dn / ts.length) * 100 : 0}%` }} />
+                    </span>
+                    {ts.slice(0, 3).map((t) => (
+                      <span key={t.id} className={`block text-xs truncate mt-0.5 ${t.status === 'done' ? `line-through ${isT ? 'text-white/60' : 'text-slate-400'}` : isT ? 'text-white/90' : 'text-slate-600'}`}>
+                        {t.status === 'done' ? '✓ ' : '· '}{t.title}
+                      </span>
+                    ))}
+                    {ts.length > 3 && <span className={`block text-[11px] mt-0.5 ${isT ? 'text-white/60' : 'text-slate-400'}`}>+{ts.length - 3} more — tap to open day →</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ) : (
-          <ul className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden bg-white">
-            {dayTasks.map((t) => taskRow(t, { toMaster: true }))}
-          </ul>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <button onClick={() => setMon((c) => { const d = new Date(c.y, c.m - 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; })} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="previous month">‹</button>
+              <h2 className="font-display font-bold text-base">🗓️ {monthLabel(mon.y, mon.m)}</h2>
+              <button onClick={() => setMon((c) => { const d = new Date(c.y, c.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; })} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="next month">›</button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 mt-2 text-center text-[10px] font-bold text-slate-400 uppercase">
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+            </div>
+            <div className="grid gap-1 mt-1">
+              {monthWeeks.map((week, wi) => (
+                <div key={wi} className="grid grid-cols-7 gap-1">
+                  {week.map((date, di) => {
+                    if (!date) return <span key={di} />;
+                    const s = dayStats[date] || { total: 0, done: 0 };
+                    const isT = date === today;
+                    const pct = s.total ? s.done / s.total : 0;
+                    return (
+                      <button key={di} onClick={() => jumpToDay(date)} title={`${fmtDateLong(date)}: ${s.done}/${s.total} done — tap to open`}
+                        className={`aspect-square rounded-xl text-xs font-bold flex flex-col items-center justify-center transition ${s.total ? 'bg-indigo-100 text-indigo-900 shadow-sm' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'} ${isT ? 'ring-2 ring-slate-900 ring-offset-1' : ''}`}>
+                        <span>{Number(date.slice(8, 10))}</span>
+                        {s.total > 0 && <span className="text-[9px] leading-none">{s.done}/{s.total}</span>}
+                        {s.total > 0 && (
+                          <span className="w-4/5 h-1 rounded-full bg-white/70 mt-0.5 overflow-hidden">
+                            <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${pct * 100}%` }} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">Tap any day to open it. Repeating tasks appear automatically after you complete one. 🔁</p>
+          </div>
         )}
       </section>
 
