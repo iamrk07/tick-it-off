@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, useCloudStore, uid, now, LOCAL_USER_ID } from './lib/store.js';
 import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
 import Growth from './components/Growth.jsx';
 import Todo from './components/Todo.jsx';
 import Ideas from './components/Ideas.jsx';
-import { calcStreak, plural, fmtShort, fmtDateTime, fmtDay } from './lib/growth.js';
+import { calcStreak, plural, fmtShort, fmtDateTime, fmtDay, todayLocal } from './lib/growth.js';
 import { toJSON, toCSV } from './lib/export.js';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
@@ -65,6 +65,43 @@ export default function App() {
   const [titleDraft, setTitleDraft] = useState('');
   const [form, setForm] = useState(emptyItem(data.categories[0]?.id));
   const [newCat, setNewCat] = useState({ name: '', color: COLORS[0], icon: ICONS[0] });
+  const [day, setDayState] = useState(todayLocal());
+  const [period, setPeriodState] = useState('day');
+
+  // ---------- in-app back-button navigation ----------
+  // Every screen move pushes a browser-history entry, so the phone's back
+  // button walks back through the app (details → list → home) instead of
+  // closing it. At home, back exits as usual.
+  const HOME_LOC = { view: 'home', mobileTab: 'items', gtab: 'trackers', ttab: 'today', itab: 'projects', selectedCat: 'all', selectedItemId: null, modal: false, day: todayLocal(), period: 'day' };
+  const locRef = useRef(HOME_LOC);
+  const applyLoc = (s) => {
+    setView(s.view); setMobileTab(s.mobileTab); setGtab(s.gtab); setTtab(s.ttab); setItab(s.itab);
+    setSelectedCat(s.selectedCat); setSelectedItemId(s.selectedItemId);
+    setShowModal(!!s.modal); setDayState(s.day || todayLocal()); setPeriodState(s.period || 'day');
+  };
+  const go = (patch, opts) => {
+    const next = { ...locRef.current, ...patch };
+    if (JSON.stringify(next) === JSON.stringify(locRef.current)) return; // already here — no duplicate entry
+    locRef.current = next;
+    applyLoc(next);
+    try {
+      if (opts && opts.replace) window.history.replaceState(next, '');
+      else window.history.pushState(next, '');
+    } catch { /* non-browser contexts — ignore */ }
+  };
+  useEffect(() => {
+    const init = { ...HOME_LOC };
+    locRef.current = init;
+    try { window.history.replaceState(init, ''); } catch { /* ignore */ }
+    const onPop = (e) => {
+      const s = e && e.state;
+      if (!s || typeof s !== 'object') return; // first entry → let the browser exit
+      locRef.current = { ...init, ...s };
+      applyLoc(locRef.current);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   const cats = useMemo(() => [...data.categories].sort((a, b) => a.sort_order - b.sort_order), [data.categories]);
   const catById = Object.fromEntries(cats.map((c) => [c.id, c]));
@@ -145,12 +182,7 @@ export default function App() {
   const resetView = () => {
     setQuery('');
     setStatusFilter('active');
-    setSelectedCat('all');
-    setSelectedItemId(null);
-    setMobileTab('items');
-    setTtab('today');
-    setItab('projects');
-    setView('home');
+    go({ view: 'home', mobileTab: 'items', ttab: 'today', itab: 'projects', gtab: 'trackers', selectedCat: 'all', selectedItemId: null, modal: false }, { replace: true });
   };
 
   // ---------- category actions ----------
@@ -162,7 +194,7 @@ export default function App() {
       ...d,
       categories: [...d.categories, { id, user_id: LOCAL_USER_ID, name: name.trim(), color, icon, sort_order: max + 1, created_at: now() }],
     }));
-    setSelectedCat(id);
+    go({ selectedCat: id }, { replace: true });
   };
   const patchCategory = (id, patch) =>
     setData((d) => ({ ...d, categories: d.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
@@ -177,7 +209,7 @@ export default function App() {
         subitems: d.subitems.filter((s) => !ids.has(s.item_id)),
       };
     });
-    if (selectedCat === id) setSelectedCat('all');
+    if (selectedCat === id) go({ selectedCat: 'all' }, { replace: true });
   };
   const moveCategory = (id, dir) => {
     const sorted = [...cats];
@@ -190,13 +222,12 @@ export default function App() {
   };
 
   const selectCat = (id) => {
-    setSelectedCat(id);
+    go({ selectedCat: id, mobileTab: 'items' });
     // Keep a fresh (not-yet-opened) add-form in sync so it always
     // defaults to the category you're looking at.
     if (!showModal && !editingItem) {
       setForm((f) => ({ ...f, category_id: id !== 'all' ? id : f.category_id || cats[0]?.id }));
     }
-    setMobileTab('items');
   };
 
   // ---------- item actions (modal popup form) ----------
@@ -204,11 +235,11 @@ export default function App() {
     setEditingItem(null);
     setForm(emptyItem(defaultCatId()));
     setNewCat({ name: '', color: COLORS[0], icon: ICONS[0] });
-    setShowModal(true);
+    go({ modal: true });
   };
   const closeModal = () => {
-    setShowModal(false);
     setEditingItem(null);
+    go({ modal: false }, { replace: true });
   };
 
   const saveItem = () => {
@@ -220,7 +251,7 @@ export default function App() {
       const maxOrder = cats.reduce((m, c) => Math.max(m, c.sort_order), -1);
       const fresh = { id: catId, user_id: LOCAL_USER_ID, name: newCat.name.trim(), color: newCat.color, icon: newCat.icon, sort_order: maxOrder + 1, created_at: now() };
       setData((d) => ({ ...d, categories: [...d.categories, fresh] }));
-      setSelectedCat(catId);
+      go({ selectedCat: catId }, { replace: true });
     }
     if (!catId) return alert('Pick a category');
     let savedId = editingItem?.id;
@@ -258,11 +289,9 @@ export default function App() {
       }));
     }
     setEditingItem(null);
-    setShowModal(false);
-    setSelectedItemId(savedId);
     setForm(emptyItem(catId || cats[0]?.id));
     setNewCat({ name: '', color: COLORS[0], icon: ICONS[0] });
-    setMobileTab('details');
+    go({ modal: false, selectedItemId: savedId, mobileTab: 'details' }, { replace: true });
   };
 
   const toggleDone = (item) => {
@@ -276,7 +305,7 @@ export default function App() {
       ...d,
       items: d.items.map((i) => (i.id === id ? { ...i, is_archived: true, archived_at: t, updated_at: t } : i)),
     }));
-    if (selectedItemId === id) setSelectedItemId(null);
+    if (selectedItemId === id) go({ selectedItemId: null }, { replace: true });
   };
   const restoreItem = (id) => {
     setData((d) => ({
@@ -291,8 +320,8 @@ export default function App() {
       items: d.items.filter((i) => i.id !== id),
       subitems: d.subitems.filter((s) => s.item_id !== id),
     }));
-    if (selectedItemId === id) setSelectedItemId(null);
-    if (editingItem?.id === id) { setEditingItem(null); setShowModal(false); }
+    if (selectedItemId === id) go({ selectedItemId: null }, { replace: true });
+    if (editingItem?.id === id) { setEditingItem(null); go({ modal: false }, { replace: true }); }
   };
   const toggleSub = (sub) =>
     setData((d) => ({
@@ -304,18 +333,20 @@ export default function App() {
   const startEdit = (item) => {
     const subs = data.subitems.filter((s) => s.item_id === item.id);
     setEditingItem(item);
-    setSelectedItemId(item.id);
     setForm({
       category_id: item.category_id, title: item.title, notes: item.notes ?? '', link: item.link ?? '',
       is_checklist: item.is_checklist, subs: item.is_checklist ? (subs.length ? subs : [{ text: '' }]) : [''],
     });
-    setShowModal(true);
+    go({ modal: true, selectedItemId: item.id });
   };
 
   const pickItem = (id) => {
-    setSelectedItemId(id);
-    setMobileTab('details');
+    go({ selectedItemId: id, mobileTab: 'details' });
   };
+
+  const goDay = (d) => go({ day: d });
+  const goPeriod = (p) => go({ period: p });
+  const openDay = (date) => go({ day: date, period: 'day' });
 
   const appTitle = data.settings?.appTitle ?? 'Tick It Off ✅';
   const viewedCat = selectedCat === 'all' ? null : catById[selectedCat];
@@ -434,7 +465,7 @@ export default function App() {
       {view === 'home' ? (
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 pb-28 lg:pb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button
-          onClick={() => { setView('todo'); setTtab('today'); }}
+          onClick={() => go({ view: 'todo', ttab: 'today' })}
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-sky-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1 60%, #8b5cf6)' }}
         >
@@ -450,7 +481,7 @@ export default function App() {
           </div>
         </button>
         <button
-          onClick={() => { setView('plan'); setMobileTab('items'); }}
+          onClick={() => go({ view: 'plan', mobileTab: 'items' })}
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-violet-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed 55%, #db2777)' }}
         >
@@ -466,7 +497,7 @@ export default function App() {
           </div>
         </button>
         <button
-          onClick={() => { setView('ideas'); setItab('projects'); }}
+          onClick={() => go({ view: 'ideas', itab: 'projects' })}
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-orange-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316 55%, #ef4444)' }}
         >
@@ -482,7 +513,7 @@ export default function App() {
           </div>
         </button>
         <button
-          onClick={() => { setView('growth'); setGtab('trackers'); }}
+          onClick={() => go({ view: 'growth', gtab: 'trackers' })}
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-emerald-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #059669, #0d9488 55%, #0284c7)' }}
         >
@@ -701,15 +732,15 @@ export default function App() {
       </div>
       ) : view === 'todo' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
-        <Todo data={data} setData={setData} ttab={ttab} setTtab={setTtab} />
+        <Todo data={data} setData={setData} ttab={ttab} setTtab={(t) => go({ ttab: t })} day={day} setDay={goDay} period={period} setPeriod={goPeriod} openDay={openDay} />
       </div>
       ) : view === 'growth' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
-        <Growth data={data} setData={setData} gtab={gtab} setGtab={setGtab} />
+        <Growth data={data} setData={setData} gtab={gtab} setGtab={(t) => go({ gtab: t })} />
       </div>
       ) : (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
-        <Ideas data={data} setData={setData} itab={itab} setItab={setItab} />
+        <Ideas data={data} setData={setData} itab={itab} setItab={(t) => go({ itab: t })} />
       </div>
       )}
 
@@ -796,38 +827,38 @@ export default function App() {
       <nav className={`lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid gap-2 text-xs font-bold ${view === 'home' ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {(view === 'home'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: true },
-              { k: 'todo', label: '✅ To-Do', fn: () => { setView('todo'); setTtab('today'); }, active: false },
-              { k: 'bucket', label: '🪣 Bucket', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
-              { k: 'ideas', label: '💡 Ideas', fn: () => { setView('ideas'); setItab('projects'); }, active: false },
-              { k: 'growth', label: '📈 Growth', fn: () => { setView('growth'); setGtab('trackers'); }, active: false },
+              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: true },
+              { k: 'todo', label: '✅ To-Do', fn: () => go({ view: 'todo', ttab: 'today' }), active: false },
+              { k: 'bucket', label: '🪣 Bucket', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: false },
+              { k: 'ideas', label: '💡 Ideas', fn: () => go({ view: 'ideas', itab: 'projects' }), active: false },
+              { k: 'growth', label: '📈 Growth', fn: () => go({ view: 'growth', gtab: 'trackers' }), active: false },
             ]
           : view === 'ideas'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
-              { k: 'projects', label: '💡 Ventures', fn: () => setItab('projects'), active: itab === 'projects' },
-              { k: 'detail', label: '📂 File', fn: () => setItab('detail'), active: itab === 'detail' },
-              { k: 'todo', label: '✅ To-Do', fn: () => { setView('todo'); setTtab('today'); }, active: false },
+              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: false },
+              { k: 'projects', label: '💡 Ventures', fn: () => go({ itab: 'projects' }), active: itab === 'projects' },
+              { k: 'detail', label: '📂 File', fn: () => go({ itab: 'detail' }), active: itab === 'detail' },
+              { k: 'todo', label: '✅ To-Do', fn: () => go({ view: 'todo', ttab: 'today' }), active: false },
             ]
           : view === 'todo'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
-              { k: 'master', label: '📥 Master', fn: () => setTtab('master'), active: ttab === 'master' },
-              { k: 'today', label: '☀️ Today', fn: () => setTtab('today'), active: ttab === 'today' },
-              { k: 'history', label: '🕘 History', fn: () => setTtab('history'), active: ttab === 'history' },
+              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: false },
+              { k: 'master', label: '📥 Master', fn: () => go({ ttab: 'master' }), active: ttab === 'master' },
+              { k: 'today', label: '☀️ Today', fn: () => go({ ttab: 'today' }), active: ttab === 'today' },
+              { k: 'history', label: '🕘 History', fn: () => go({ ttab: 'history' }), active: ttab === 'history' },
             ]
           : view === 'growth'
           ? [
-              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
-              { k: 'trackers', label: '📈 Trackers', fn: () => setGtab('trackers'), active: gtab === 'trackers' },
-              { k: 'progress', label: '✅ Progress', fn: () => setGtab('progress'), active: gtab === 'progress' },
-              { k: 'bucket', label: '🪣 Bucket', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
+              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: false },
+              { k: 'trackers', label: '📈 Trackers', fn: () => go({ gtab: 'trackers' }), active: gtab === 'trackers' },
+              { k: 'progress', label: '✅ Progress', fn: () => go({ gtab: 'progress' }), active: gtab === 'progress' },
+              { k: 'bucket', label: '🪣 Bucket', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: false },
             ]
           : [
-              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: view === 'home' },
-              { k: 'cats', label: '📁 Cats', fn: () => setMobileTab('cats'), active: view === 'plan' && mobileTab === 'cats' },
-              { k: 'items', label: '🗂️ Entries', fn: () => { setView('plan'); setMobileTab('items'); }, active: view === 'plan' && mobileTab === 'items' },
-              { k: 'details', label: '✨ Details', fn: () => { setView('plan'); setMobileTab('details'); }, active: view === 'plan' && mobileTab === 'details' },
+              { k: 'home', label: '🏠 Home', fn: () => go({ view: 'home' }), active: view === 'home' },
+              { k: 'cats', label: '📁 Cats', fn: () => go({ mobileTab: 'cats' }), active: view === 'plan' && mobileTab === 'cats' },
+              { k: 'items', label: '🗂️ Entries', fn: () => go({ view: 'plan', mobileTab: 'items' }), active: view === 'plan' && mobileTab === 'items' },
+              { k: 'details', label: '✨ Details', fn: () => go({ view: 'plan', mobileTab: 'details' }), active: view === 'plan' && mobileTab === 'details' },
             ]
         ).map((b) => (
           <button key={b.k} onClick={b.fn}

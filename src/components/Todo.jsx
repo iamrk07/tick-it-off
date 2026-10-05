@@ -39,20 +39,18 @@ const weekdayLong = (dateStr) => {
 };
 
 // To-Do: Master backlog (unscheduled) + day view + 30-day history.
-// Props: data, setData, ttab/setTtab (mobile panes: master | today | history)
-export default function Todo({ data, setData, ttab, setTtab }) {
+// Props: data, setData, ttab/setTtab (mobile panes), day/setDay, period/setPeriod, openDay (all routed through app history for back-button support)
+export default function Todo({ data, setData, ttab, setTtab, day, setDay, period, setPeriod, openDay }) {
   const me = data.user?.id ?? 'local-user';
   const tasks = data.tasks || [];
   const today = todayLocal();
 
-  const [day, setDay] = useState(today);
   const [histDay, setHistDay] = useState(today);
   const [masterDraft, setMasterDraft] = useState('');
   const [dayDraft, setDayDraft] = useState('');
   const [dismissed, setDismissed] = useState(''); // date for which the overdue nudge was left alone
   const [showOverdue, setShowOverdue] = useState(false); // expand the unfinished-items list
-  const [period, setPeriod] = useState('day'); // day | week | month (middle pane)
-  const [weekOff, setWeekOff] = useState(0); // 0 = this week
+  const [weekOff, setWeekOff] = useState(0); // 0 = this week (local only)
   const [mon, setMon] = useState(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
@@ -100,8 +98,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
   const monthWeeks = useMemo(() => monthGrid(mon.y, mon.m), [mon]);
 
   const jumpToDay = (date) => {
-    setDay(date);
-    setPeriod('day');
+    openDay(date);
   };
 
   // ---------- actions ----------
