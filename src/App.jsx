@@ -3,7 +3,8 @@ import { useStore, useCloudStore, uid, now, LOCAL_USER_ID } from './lib/store.js
 import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
 import Growth from './components/Growth.jsx';
-import { calcStreak, plural, fmtShort, fmtDateTime } from './lib/growth.js';
+import Todo from './components/Todo.jsx';
+import { calcStreak, plural, fmtShort, fmtDateTime, fmtDay } from './lib/growth.js';
 import { toJSON, toCSV } from './lib/export.js';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
@@ -16,7 +17,7 @@ function emptyItem(catId) {
   return { category_id: catId ?? '', title: '', notes: '', link: '', is_checklist: false, subs: [''] };
 }
 // Placeholder while cloud data loads (replaced before anything renders)
-const EMPTY = { user: null, settings: { appTitle: 'Tick It Off ✅', tagline: '' }, categories: [], items: [], subitems: [], trackers: [], tracker_logs: [] };
+const EMPTY = { user: null, settings: { appTitle: 'Tick It Off ✅', tagline: '' }, categories: [], items: [], subitems: [], trackers: [], tracker_logs: [], tasks: [] };
 const asLink = (l) => (/^https?:\/\//i.test(l) ? l : `https://${l}`);
 
 // A fresh line of fuel under the title — rotates daily
@@ -55,8 +56,9 @@ export default function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [mobileTab, setMobileTab] = useState('items'); // cats | items | details
-  const [view, setView] = useState('home'); // home | plan | growth
+  const [view, setView] = useState('home'); // home | plan | todo | growth
   const [gtab, setGtab] = useState('trackers'); // trackers | progress (mobile panes in growth view)
+  const [ttab, setTtab] = useState('today'); // master | today | history (mobile panes in todo view)
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [form, setForm] = useState(emptyItem(data.categories[0]?.id));
@@ -108,6 +110,11 @@ export default function App() {
   const doneCount = data.items.filter((i) => i.status === 'done' && !i.is_archived).length;
   const archivedCount = data.items.filter((i) => i.is_archived).length;
 
+  // To-Do counts for home + header (today = scheduled today & open; master = unscheduled & open)
+  const todayStr = fmtDay(new Date());
+  const todoTodayOpen = (data.tasks || []).filter((t) => t.scheduled_date === todayStr && t.status === 'active').length;
+  const todoMaster = (data.tasks || []).filter((t) => !t.scheduled_date && t.status === 'active').length;
+
   // Best day-streak across all growth trackers (for the home card)
   const bestStreak = useMemo(() => {
     let best = 0;
@@ -138,6 +145,7 @@ export default function App() {
     setSelectedCat('all');
     setSelectedItemId(null);
     setMobileTab('items');
+    setTtab('today');
     setView('home');
   };
 
@@ -376,6 +384,12 @@ export default function App() {
                 {view === 'growth' && (
                   <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {plural((data.trackers || []).filter((t) => !t.is_archived).length, 'tracker')} · 🔥 {bestStreak} best streak</span>
                 )}
+                {view === 'todo' && (
+                  <>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">☀️ {todoTodayOpen} today</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📥 {todoMaster} master</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0 items-end">
@@ -390,7 +404,7 @@ export default function App() {
               </details>
             </div>
           </div>
-          {view !== 'home' && (
+          {view === 'plan' && (
           <div className="mt-3">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
@@ -406,18 +420,34 @@ export default function App() {
         </div>
       </header>
 
-      {/* ===== Home / Planner / Growth ===== */}
+      {/* ===== Home / Bucket / To-Do / Growth ===== */}
       {view === 'home' ? (
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6 pb-28 lg:pb-10 grid gap-4 sm:grid-cols-2">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 pb-28 lg:pb-10 grid gap-4 sm:grid-cols-3">
+        <button
+          onClick={() => { setView('todo'); setTtab('today'); }}
+          className="text-left rounded-3xl p-6 text-white shadow-xl shadow-sky-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
+          style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1 60%, #8b5cf6)' }}
+        >
+          <div>
+            <div className="text-5xl">✅</div>
+            <h2 className="font-display text-2xl font-bold mt-3">To-Do</h2>
+            <p className="text-white/80 text-sm mt-1">Master backlog, today's plan & 30-day history.</p>
+          </div>
+          <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
+            <span className="bg-white/20 rounded-full px-3 py-1">☀️ {todoTodayOpen} today</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">📥 {todoMaster} master</span>
+            <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
+          </div>
+        </button>
         <button
           onClick={() => { setView('plan'); setMobileTab('items'); }}
-          className="text-left rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-violet-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
+          className="text-left rounded-3xl p-6 text-white shadow-xl shadow-violet-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed 55%, #db2777)' }}
         >
           <div>
-            <div className="text-6xl">🗂️</div>
-            <h2 className="font-display text-3xl font-bold mt-3">Planner</h2>
-            <p className="text-white/80 text-sm mt-1">Goals, to-dos & reminders under your own categories.</p>
+            <div className="text-5xl">🪣</div>
+            <h2 className="font-display text-2xl font-bold mt-3">Bucket List</h2>
+            <p className="text-white/80 text-sm mt-1">Dreams, places, books & things to do one day.</p>
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
             <span className="bg-white/20 rounded-full px-3 py-1">🔥 {activeCount} active</span>
@@ -427,12 +457,12 @@ export default function App() {
         </button>
         <button
           onClick={() => { setView('growth'); setGtab('trackers'); }}
-          className="text-left rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
+          className="text-left rounded-3xl p-6 text-white shadow-xl shadow-emerald-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
           style={{ background: 'linear-gradient(135deg, #059669, #0d9488 55%, #0284c7)' }}
         >
           <div>
-            <div className="text-6xl">📈</div>
-            <h2 className="font-display text-3xl font-bold mt-3">Growth</h2>
+            <div className="text-5xl">📈</div>
+            <h2 className="font-display text-2xl font-bold mt-3">Growth</h2>
             <p className="text-white/80 text-sm mt-1">Track gym, reading, calm… streaks, tables & calendars.</p>
           </div>
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
@@ -441,7 +471,7 @@ export default function App() {
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
-        <p className="text-center text-xs text-slate-400 italic sm:col-span-2 -mt-1">“{todayQuote()}”</p>
+        <p className="text-center text-xs text-slate-400 italic sm:col-span-3 -mt-1">“{todayQuote()}”</p>
       </div>
       ) : view === 'plan' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 grid gap-4 lg:grid-cols-[290px_minmax(0,1fr)_380px] items-start pb-28 lg:pb-10">
@@ -643,6 +673,10 @@ export default function App() {
 
         </aside>
       </div>
+      ) : view === 'todo' ? (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
+        <Todo data={data} setData={setData} ttab={ttab} setTtab={setTtab} />
+      </div>
       ) : (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
         <Growth data={data} setData={setData} gtab={gtab} setGtab={setGtab} />
@@ -730,12 +764,26 @@ export default function App() {
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-2 text-xs font-bold">
-        {(view === 'growth'
+        {(view === 'home'
+          ? [
+              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: true },
+              { k: 'todo', label: '✅ To-Do', fn: () => { setView('todo'); setTtab('today'); }, active: false },
+              { k: 'bucket', label: '🪣 Bucket', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
+              { k: 'growth', label: '📈 Growth', fn: () => { setView('growth'); setGtab('trackers'); }, active: false },
+            ]
+          : view === 'todo'
+          ? [
+              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
+              { k: 'master', label: '📥 Master', fn: () => setTtab('master'), active: ttab === 'master' },
+              { k: 'today', label: '☀️ Today', fn: () => setTtab('today'), active: ttab === 'today' },
+              { k: 'history', label: '🕘 History', fn: () => setTtab('history'), active: ttab === 'history' },
+            ]
+          : view === 'growth'
           ? [
               { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
               { k: 'trackers', label: '📈 Trackers', fn: () => setGtab('trackers'), active: gtab === 'trackers' },
               { k: 'progress', label: '✅ Progress', fn: () => setGtab('progress'), active: gtab === 'progress' },
-              { k: 'plan', label: '🗂️ Planner', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
+              { k: 'bucket', label: '🪣 Bucket', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
             ]
           : [
               { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: view === 'home' },

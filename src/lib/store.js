@@ -51,6 +51,7 @@ const seed = () => ({
   subitems: [],
   trackers: defaultTrackers(LOCAL_USER_ID),
   tracker_logs: [],
+  tasks: [],
 });
 
 function migrate(raw) {
@@ -65,6 +66,7 @@ function migrate(raw) {
   if (!Array.isArray(d.subitems)) d.subitems = [];
   if (!Array.isArray(d.trackers)) d.trackers = [];
   if (!Array.isArray(d.tracker_logs)) d.tracker_logs = [];
+  if (!Array.isArray(d.tasks)) d.tasks = [];
   // Custom-column defaults for data created before custom fields existed
   d.trackers.forEach((t) => {
     if (!Array.isArray(t.fields)) t.fields = [];
@@ -143,7 +145,12 @@ export function normalizeForCloud(data, userId) {
     user_id: userId,
     tracker_id: trackerMap[l.tracker_id] ?? l.tracker_id,
   }));
-  return { ...data, categories, items, subitems, trackers, tracker_logs };
+  const tasks = (data.tasks || []).map((t) => ({
+    ...t,
+    id: UUID_RE.test(t.id || '') ? t.id : uid(),
+    user_id: userId,
+  }));
+  return { ...data, categories, items, subitems, trackers, tracker_logs, tasks };
 }
 
 function throwIf(error, where) {
@@ -175,7 +182,10 @@ export async function pullCloud(userId) {
     throwIf(e5, 'load activity');
     tracker_logs = tl || [];
   }
-  return { categories: categories || [], items: items || [], subitems, trackers: trackers || [], tracker_logs };
+  const { data: tasks, error: e6 } = await supabase
+    .from('tasks').select('*').eq('user_id', userId);
+  throwIf(e6, 'load to-dos');
+  return { categories: categories || [], items: items || [], subitems, trackers: trackers || [], tracker_logs, tasks: tasks || [] };
 }
 
 // Upload full state (upsert all rows) + delete cloud rows missing locally.
@@ -228,6 +238,17 @@ export async function pushCloud(userId, data) {
     const { error } = await supabase.from('tracker_logs').upsert(dbLogs);
     throwIf(error, 'save activity');
   }
+  const dbTasks = (data.tasks || []).map((t) => ({
+    id: t.id, user_id: userId, title: t.title, notes: t.notes ?? '',
+    scheduled_date: t.scheduled_date ?? null, repeat: t.repeat ?? 'none',
+    project_id: t.project_id ?? null, status: t.status,
+    sort_order: t.sort_order ?? 0, created_at: t.created_at, updated_at: t.updated_at,
+    completed_at: t.completed_at ?? null,
+  }));
+  if (dbTasks.length) {
+    const { error } = await supabase.from('tasks').upsert(dbTasks);
+    throwIf(error, 'save to-dos');
+  }
 
   // Delete cloud orphans (rows the user removed on this device).
   const { data: rc, error: re1 } = await supabase.from('categories').select('id').eq('user_id', userId);
@@ -277,6 +298,15 @@ export async function pushCloud(userId, data) {
       throwIf(error, 'delete activity');
     }
   }
+  // Task orphans
+  const { data: rk, error: re6 } = await supabase.from('tasks').select('id').eq('user_id', userId);
+  throwIf(re6, 'check to-dos');
+  const keepTasks = new Set((data.tasks || []).map((t) => t.id));
+  const delTasks = (rk || []).map((r) => r.id).filter((id) => !keepTasks.has(id));
+  if (delTasks.length) {
+    const { error } = await supabase.from('tasks').delete().in('id', delTasks);
+    throwIf(error, 'delete to-dos');
+  }
 }
 
 // Make sure a profile row exists for FK references (best-effort; a DB trigger
@@ -291,7 +321,8 @@ export async function upsertProfile(user) {
 
 const hasContent = (d) =>
   !!d && ((d.categories && d.categories.length > 0) || (d.items && d.items.length > 0) ||
-    (d.trackers && d.trackers.length > 0) || (d.tracker_logs && d.tracker_logs.length > 0));
+    (d.trackers && d.trackers.length > 0) || (d.tracker_logs && d.tracker_logs.length > 0) ||
+    (d.tasks && d.tasks.length > 0));
 
 // Cloud store: same [data, setData] interface as useStore, so the whole UI
 // works unchanged. Pulls on login, pushes (debounced) on every change.
@@ -326,7 +357,7 @@ export function useCloudStore(session, getLocal) {
       setSync({ state: 'loading', at: null, error: '' });
       try {
         const cloud = await pullCloud(userId);
-        const cloudEmpty = cloud.categories.length === 0 && cloud.items.length === 0 && (cloud.trackers || []).length === 0;
+        const cloudEmpty = cloud.categories.length === 0 && cloud.items.length === 0 && (cloud.trackers || []).length === 0 && (cloud.tasks || []).length === 0;
         const local = localRef.current;
         if (cloudEmpty && hasContent(local)) {
           // First login: move this device's entries up to the cloud
@@ -364,6 +395,7 @@ export function useCloudStore(session, getLocal) {
             subitems: [],
             trackers: defaultTrackers(userId),
             tracker_logs: [],
+            tasks: [],
           };
           await pushCloud(userId, fresh);
           if (!cancelled) {

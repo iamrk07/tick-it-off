@@ -122,3 +122,29 @@ alter table tracker_logs add column if not exists extra jsonb default '{}';
 -- Tracker archive upgrade (soft delete, like entries)
 alter table trackers add column if not exists is_archived boolean default false;
 alter table trackers add column if not exists archived_at timestamptz;
+
+-- To-Do: date-bound tasks (Master backlog + day plans + history).
+-- repeat / project_id are forward-looking (Phase B weekly-monthly + Phase C projects).
+create table if not exists tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  title text not null,
+  notes text default '',
+  scheduled_date date,
+  repeat text default 'none',
+  project_id uuid,
+  status text default 'active' check (status in ('active', 'done')),
+  sort_order int default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  completed_at timestamptz
+);
+
+alter table tasks enable row level security;
+
+drop policy if exists "own tasks" on tasks;
+create policy "own tasks" on tasks
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists idx_tasks_user on tasks(user_id, scheduled_date);
+grant all on public.tasks to authenticated;
