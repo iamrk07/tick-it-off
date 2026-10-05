@@ -3,6 +3,7 @@ import { useStore, useCloudStore, uid, now, LOCAL_USER_ID } from './lib/store.js
 import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
 import Growth from './components/Growth.jsx';
+import { calcStreak } from './lib/growth.js';
 import { toJSON, toCSV } from './lib/export.js';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ef4444', '#0ea5e9', '#64748b'];
@@ -68,7 +69,7 @@ export default function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [mobileTab, setMobileTab] = useState('items'); // cats | items | details
-  const [view, setView] = useState('plan'); // plan | growth
+  const [view, setView] = useState('home'); // home | plan | growth
   const [gtab, setGtab] = useState('trackers'); // trackers | progress (mobile panes in growth view)
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -121,6 +122,16 @@ export default function App() {
   const doneCount = data.items.filter((i) => i.status === 'done' && !i.is_archived).length;
   const archivedCount = data.items.filter((i) => i.is_archived).length;
 
+  // Best day-streak across all growth trackers (for the home card)
+  const bestStreak = useMemo(() => {
+    let best = 0;
+    (data.trackers || []).forEach((t) => {
+      const dates = new Set((data.tracker_logs || []).filter((l) => l.tracker_id === t.id).map((l) => l.log_date));
+      best = Math.max(best, calcStreak(dates));
+    });
+    return best;
+  }, [data.trackers, data.tracker_logs]);
+
   // The category a NEW entry should land in: the one you're viewing,
   // or the first category when viewing "All".
   const defaultCatId = () => (selectedCat !== 'all' ? selectedCat : cats[0]?.id ?? '');
@@ -133,13 +144,14 @@ export default function App() {
     setEditingTitle(false);
   };
 
-  // Clicking the title resets the whole view (home)
+  // Clicking the title goes home (the ultimate reset)
   const resetView = () => {
     setQuery('');
     setStatusFilter('active');
     setSelectedCat('all');
     setSelectedItemId(null);
     setMobileTab('items');
+    setView('home');
   };
 
   // ---------- category actions ----------
@@ -393,6 +405,7 @@ export default function App() {
               </div>
             </div>
           </div>
+          {view !== 'home' && (
           <div className="mt-3">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
@@ -404,11 +417,47 @@ export default function App() {
               />
             </div>
           </div>
+          )}
         </div>
       </header>
 
-      {/* ===== 3-pane layout (planner) / Growth view ===== */}
-      {view === 'plan' ? (
+      {/* ===== Home / Planner / Growth ===== */}
+      {view === 'home' ? (
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6 pb-28 lg:pb-10 grid gap-4 sm:grid-cols-2">
+        <button
+          onClick={() => { setView('plan'); setMobileTab('items'); }}
+          className="text-left rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-violet-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
+          style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed 55%, #db2777)' }}
+        >
+          <div>
+            <div className="text-6xl">🗂️</div>
+            <h2 className="font-display text-3xl font-bold mt-3">Planner</h2>
+            <p className="text-white/80 text-sm mt-1">Goals, to-dos & reminders under your own categories.</p>
+          </div>
+          <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
+            <span className="bg-white/20 rounded-full px-3 py-1">🔥 {activeCount} active</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">📁 {cats.length} categories</span>
+            <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
+          </div>
+        </button>
+        <button
+          onClick={() => { setView('growth'); setGtab('trackers'); }}
+          className="text-left rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
+          style={{ background: 'linear-gradient(135deg, #059669, #0d9488 55%, #0284c7)' }}
+        >
+          <div>
+            <div className="text-6xl">📈</div>
+            <h2 className="font-display text-3xl font-bold mt-3">Growth</h2>
+            <p className="text-white/80 text-sm mt-1">Track gym, reading, calm… streaks, tables & calendars.</p>
+          </div>
+          <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
+            <span className="bg-white/20 rounded-full px-3 py-1">🔥 {bestStreak} best streak</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">📈 {(data.trackers || []).length} trackers</span>
+            <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
+          </div>
+        </button>
+      </div>
+      ) : view === 'plan' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 grid gap-4 lg:grid-cols-[290px_minmax(0,1fr)_380px] items-start pb-28 lg:pb-10">
 
         {/* LEFT: categories */}
@@ -701,17 +750,19 @@ export default function App() {
       )}
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-3 gap-2 text-xs font-bold">
-        {(view === 'plan'
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-2 text-xs font-bold">
+        {(view === 'growth'
           ? [
-              { k: 'cats', label: '📁 Categories', fn: () => setMobileTab('cats'), active: mobileTab === 'cats' },
-              { k: 'items', label: '🗂️ Entries', fn: () => setMobileTab('items'), active: mobileTab === 'items' },
-              { k: 'details', label: '✨ Details', fn: () => setMobileTab('details'), active: mobileTab === 'details' },
-            ]
-          : [
+              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
               { k: 'trackers', label: '📈 Trackers', fn: () => setGtab('trackers'), active: gtab === 'trackers' },
               { k: 'progress', label: '✅ Progress', fn: () => setGtab('progress'), active: gtab === 'progress' },
-              { k: 'plan', label: '🗂️ Planner', fn: () => setView('plan'), active: false },
+              { k: 'plan', label: '🗂️ Planner', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
+            ]
+          : [
+              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: view === 'home' },
+              { k: 'cats', label: '📁 Cats', fn: () => setMobileTab('cats'), active: view === 'plan' && mobileTab === 'cats' },
+              { k: 'items', label: '🗂️ Entries', fn: () => { setView('plan'); setMobileTab('items'); }, active: view === 'plan' && mobileTab === 'items' },
+              { k: 'details', label: '✨ Details', fn: () => { setView('plan'); setMobileTab('details'); }, active: view === 'plan' && mobileTab === 'details' },
             ]
         ).map((b) => (
           <button key={b.k} onClick={b.fn}
