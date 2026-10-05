@@ -378,22 +378,17 @@ export default function App() {
                 </div>
               )}
               <p className="text-white/80 text-xs sm:text-sm mt-0.5 italic">“{todayQuote()}”</p>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex gap-1 text-[11px] font-bold bg-white/15 rounded-full p-1 shrink-0">
-                  <button onClick={() => setView('plan')} className={`px-3 py-1 rounded-full transition ${view === 'plan' ? 'bg-slate-900 text-white shadow' : 'text-white/85 hover:text-white'}`}>🗂️ Planner</button>
-                  <button onClick={() => setView('growth')} className={`px-3 py-1 rounded-full transition ${view === 'growth' ? 'bg-slate-900 text-white shadow' : 'text-white/85 hover:text-white'}`}>📈 Growth</button>
-                </div>
-                {view === 'plan' ? (
-                  <div className="flex gap-2 text-[11px] overflow-x-auto nice-scroll">
+              <div className="flex gap-2 mt-2 text-[11px]">
+                {view === 'plan' && (
+                  <>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">🔥 {activeCount} active</span>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">✅ {doneCount} done</span>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 hidden sm:inline whitespace-nowrap">📁 {cats.length} categories</span>
                     {archivedCount > 0 && <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📦 {archivedCount} archived</span>}
-                  </div>
-                ) : (
-                  <div className="flex gap-2 text-[11px]">
-                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {(data.trackers || []).length} trackers</span>
-                  </div>
+                  </>
+                )}
+                {view === 'growth' && (
+                  <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📈 {(data.trackers || []).length} trackers · 🔥 {bestStreak} best streak</span>
                 )}
               </div>
             </div>
