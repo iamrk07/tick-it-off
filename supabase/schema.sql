@@ -152,3 +152,28 @@ grant all on public.tasks to authenticated;
 
 -- Repeating-series linkage (for DBs created before series_id existed)
 alter table tasks add column if not exists series_id uuid;
+
+-- Ideas / Ventures: projects & businesses with a status pipeline.
+-- tasks.project_id links to-dos to a venture (plain uuid, no FK: links survive project deletes).
+create table if not exists projects (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  name text not null,
+  icon text,
+  color text,
+  status text default 'idea' check (status in ('idea', 'active', 'parked', 'done')),
+  notes text default '',
+  link text default '',
+  sort_order int default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table projects enable row level security;
+
+drop policy if exists "own projects" on projects;
+create policy "own projects" on projects
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists idx_projects_user on projects(user_id, sort_order);
+grant all on public.projects to authenticated;

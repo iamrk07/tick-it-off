@@ -58,7 +58,8 @@ export default function Todo({ data, setData, ttab, setTtab }) {
     return { y: d.getFullYear(), m: d.getMonth() };
   });
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ title: '', notes: '', repeat: 'none' });
+  const [editDraft, setEditDraft] = useState({ title: '', notes: '', repeat: 'none', project: '' });
+  const projById = useMemo(() => Object.fromEntries((data.projects || []).map((p) => [p.id, p])), [data.projects]);
 
   const master = useMemo(
     () => tasks.filter((t) => !t.scheduled_date && t.status === 'active').sort(byCreated),
@@ -196,7 +197,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
 
   const startEdit = (t) => {
     setEditingId(t.id);
-    setEditDraft({ title: t.title, notes: t.notes ?? '', repeat: t.repeat ?? 'none' });
+    setEditDraft({ title: t.title, notes: t.notes ?? '', repeat: t.repeat ?? 'none', project: t.project_id ?? '' });
   };
 
   const saveEdit = () => {
@@ -204,7 +205,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
     setData((d) => ({
       ...d,
       tasks: d.tasks.map((x) => (x.id === editingId
-        ? { ...x, title: editDraft.title.trim(), notes: editDraft.notes, repeat: editDraft.repeat ?? 'none', updated_at: now() }
+        ? { ...x, title: editDraft.title.trim(), notes: editDraft.notes, repeat: editDraft.repeat ?? 'none', project_id: editDraft.project || null, updated_at: now() }
         : x)),
     }));
     setEditingId(null);
@@ -220,6 +221,10 @@ export default function Todo({ data, setData, ttab, setTtab }) {
           <option value="daily">🔁 Repeats daily</option>
           <option value="weekly">🔁 Repeats weekly</option>
           <option value="monthly">🔁 Repeats monthly</option>
+        </select>
+        <select value={editDraft.project} onChange={(e) => setEditDraft({ ...editDraft, project: e.target.value })} className="input !py-1.5 !text-xs flex-1" aria-label="venture">
+          <option value="">No venture</option>
+          {(data.projects || []).map((p) => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
         </select>
       </div>
       <div className="flex gap-1.5">
@@ -246,6 +251,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
           <p className={`font-semibold text-[15px] leading-snug ${t.status === 'done' ? 'line-through' : ''}`}>
             {t.title}
             {t.repeat && t.repeat !== 'none' && <span className="ml-1.5 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">🔁 {t.repeat}</span>}
+            {t.project_id && projById[t.project_id] && <span className="ml-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5 whitespace-nowrap text-white" style={{ background: projById[t.project_id].color }}>{projById[t.project_id].icon} {projById[t.project_id].name}</span>}
           </p>
           {t.notes && <p className="text-xs text-slate-500 truncate">{t.notes}</p>}
         </div>

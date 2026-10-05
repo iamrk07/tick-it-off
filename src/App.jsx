@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
 import Growth from './components/Growth.jsx';
 import Todo from './components/Todo.jsx';
+import Ideas from './components/Ideas.jsx';
 import { calcStreak, plural, fmtShort, fmtDateTime, fmtDay } from './lib/growth.js';
 import { toJSON, toCSV } from './lib/export.js';
 
@@ -17,7 +18,7 @@ function emptyItem(catId) {
   return { category_id: catId ?? '', title: '', notes: '', link: '', is_checklist: false, subs: [''] };
 }
 // Placeholder while cloud data loads (replaced before anything renders)
-const EMPTY = { user: null, settings: { appTitle: 'Tick It Off ✅', tagline: '' }, categories: [], items: [], subitems: [], trackers: [], tracker_logs: [], tasks: [] };
+const EMPTY = { user: null, settings: { appTitle: 'Tick It Off ✅', tagline: '' }, categories: [], items: [], subitems: [], trackers: [], tracker_logs: [], tasks: [], projects: [] };
 const asLink = (l) => (/^https?:\/\//i.test(l) ? l : `https://${l}`);
 
 // A fresh line of fuel under the title — rotates daily
@@ -56,9 +57,10 @@ export default function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [mobileTab, setMobileTab] = useState('items'); // cats | items | details
-  const [view, setView] = useState('home'); // home | plan | todo | growth
+  const [view, setView] = useState('home'); // home | plan | todo | growth | ideas
   const [gtab, setGtab] = useState('trackers'); // trackers | progress (mobile panes in growth view)
   const [ttab, setTtab] = useState('today'); // master | today | history (mobile panes in todo view)
+  const [itab, setItab] = useState('projects'); // projects | detail (mobile panes in ideas view)
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [form, setForm] = useState(emptyItem(data.categories[0]?.id));
@@ -114,6 +116,7 @@ export default function App() {
   const todayStr = fmtDay(new Date());
   const todoTodayOpen = (data.tasks || []).filter((t) => t.scheduled_date === todayStr && t.status === 'active').length;
   const todoMaster = (data.tasks || []).filter((t) => !t.scheduled_date && t.status === 'active').length;
+  const ideasActive = (data.projects || []).filter((p) => p.status === 'active').length;
 
   // Best day-streak across all growth trackers (for the home card)
   const bestStreak = useMemo(() => {
@@ -146,6 +149,7 @@ export default function App() {
     setSelectedItemId(null);
     setMobileTab('items');
     setTtab('today');
+    setItab('projects');
     setView('home');
   };
 
@@ -390,6 +394,12 @@ export default function App() {
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">📥 {todoMaster} master</span>
                   </>
                 )}
+                {view === 'ideas' && (
+                  <>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">💡 {(data.projects || []).length} ventures</span>
+                    <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">🚀 {ideasActive} active</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0 items-end">
@@ -422,7 +432,7 @@ export default function App() {
 
       {/* ===== Home / Bucket / To-Do / Growth ===== */}
       {view === 'home' ? (
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 pb-28 lg:pb-10 grid gap-4 sm:grid-cols-3">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 pb-28 lg:pb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button
           onClick={() => { setView('todo'); setTtab('today'); }}
           className="text-left rounded-3xl p-6 text-white shadow-xl shadow-sky-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
@@ -452,6 +462,22 @@ export default function App() {
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
             <span className="bg-white/20 rounded-full px-3 py-1">🔥 {activeCount} active</span>
             <span className="bg-white/20 rounded-full px-3 py-1">📁 {plural(cats.length, 'category', 'categories')}</span>
+            <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
+          </div>
+        </button>
+        <button
+          onClick={() => { setView('ideas'); setItab('projects'); }}
+          className="text-left rounded-3xl p-6 text-white shadow-xl shadow-orange-200 min-h-[240px] flex flex-col justify-between transition hover:scale-[1.01] active:scale-[0.99]"
+          style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316 55%, #ef4444)' }}
+        >
+          <div>
+            <div className="text-5xl">💡</div>
+            <h2 className="font-display text-2xl font-bold mt-3">Ideas</h2>
+            <p className="text-white/80 text-sm mt-1">Ventures & projects with status, notes & to-dos.</p>
+          </div>
+          <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
+            <span className="bg-white/20 rounded-full px-3 py-1">🚀 {ideasActive} active</span>
+            <span className="bg-white/20 rounded-full px-3 py-1">💡 {(data.projects || []).length} ventures</span>
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>
@@ -677,9 +703,13 @@ export default function App() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
         <Todo data={data} setData={setData} ttab={ttab} setTtab={setTtab} />
       </div>
-      ) : (
+      ) : view === 'growth' ? (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
         <Growth data={data} setData={setData} gtab={gtab} setGtab={setGtab} />
+      </div>
+      ) : (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-28 lg:pb-10">
+        <Ideas data={data} setData={setData} itab={itab} setItab={setItab} />
       </div>
       )}
 
@@ -763,13 +793,21 @@ export default function App() {
       )}
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-2 text-xs font-bold">
+      <nav className={`lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] grid gap-2 text-xs font-bold ${view === 'home' ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {(view === 'home'
           ? [
               { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: true },
               { k: 'todo', label: '✅ To-Do', fn: () => { setView('todo'); setTtab('today'); }, active: false },
               { k: 'bucket', label: '🪣 Bucket', fn: () => { setView('plan'); setMobileTab('items'); }, active: false },
+              { k: 'ideas', label: '💡 Ideas', fn: () => { setView('ideas'); setItab('projects'); }, active: false },
               { k: 'growth', label: '📈 Growth', fn: () => { setView('growth'); setGtab('trackers'); }, active: false },
+            ]
+          : view === 'ideas'
+          ? [
+              { k: 'home', label: '🏠 Home', fn: () => setView('home'), active: false },
+              { k: 'projects', label: '💡 Ventures', fn: () => setItab('projects'), active: itab === 'projects' },
+              { k: 'detail', label: '📂 File', fn: () => setItab('detail'), active: itab === 'detail' },
+              { k: 'todo', label: '✅ To-Do', fn: () => { setView('todo'); setTtab('today'); }, active: false },
             ]
           : view === 'todo'
           ? [

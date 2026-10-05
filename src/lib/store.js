@@ -43,6 +43,12 @@ export function defaultTrackers(userId) {
   ];
 }
 
+export function defaultProjects(userId) {
+  return [
+    { id: uid(), user_id: userId, name: 'Dream Startup', icon: '🚀', color: '#f59e0b', status: 'idea', notes: 'The big idea. Attach dated to-dos below and move it down the pipeline.', link: '', sort_order: 0, created_at: now(), updated_at: now() },
+  ];
+}
+
 const seed = () => ({
   user: { id: LOCAL_USER_ID, email: null, created_at: now() },
   settings: { appTitle: 'Tick It Off ✅', tagline: 'Small steps every day. 🌱' },
@@ -52,6 +58,7 @@ const seed = () => ({
   trackers: defaultTrackers(LOCAL_USER_ID),
   tracker_logs: [],
   tasks: [],
+  projects: defaultProjects(LOCAL_USER_ID),
 });
 
 function migrate(raw) {
@@ -67,6 +74,7 @@ function migrate(raw) {
   if (!Array.isArray(d.trackers)) d.trackers = [];
   if (!Array.isArray(d.tracker_logs)) d.tracker_logs = [];
   if (!Array.isArray(d.tasks)) d.tasks = [];
+  if (!Array.isArray(d.projects)) d.projects = [];
   // Custom-column defaults for data created before custom fields existed
   d.trackers.forEach((t) => {
     if (!Array.isArray(t.fields)) t.fields = [];
@@ -150,7 +158,12 @@ export function normalizeForCloud(data, userId) {
     id: UUID_RE.test(t.id || '') ? t.id : uid(),
     user_id: userId,
   }));
-  return { ...data, categories, items, subitems, trackers, tracker_logs, tasks };
+  const projects = (data.projects || []).map((p) => ({
+    ...p,
+    id: UUID_RE.test(p.id || '') ? p.id : uid(),
+    user_id: userId,
+  }));
+  return { ...data, categories, items, subitems, trackers, tracker_logs, tasks, projects };
 }
 
 function throwIf(error, where) {
@@ -185,7 +198,10 @@ export async function pullCloud(userId) {
   const { data: tasks, error: e6 } = await supabase
     .from('tasks').select('*').eq('user_id', userId);
   throwIf(e6, 'load to-dos');
-  return { categories: categories || [], items: items || [], subitems, trackers: trackers || [], tracker_logs, tasks: tasks || [] };
+  const { data: projects, error: e7 } = await supabase
+    .from('projects').select('*').eq('user_id', userId).order('sort_order');
+  throwIf(e7, 'load ideas');
+  return { categories: categories || [], items: items || [], subitems, trackers: trackers || [], tracker_logs, tasks: tasks || [], projects: projects || [] };
 }
 
 // Upload full state (upsert all rows) + delete cloud rows missing locally.
@@ -249,6 +265,15 @@ export async function pushCloud(userId, data) {
     const { error } = await supabase.from('tasks').upsert(dbTasks);
     throwIf(error, 'save to-dos');
   }
+  const dbProjects = (data.projects || []).map((p) => ({
+    id: p.id, user_id: userId, name: p.name, icon: p.icon, color: p.color,
+    status: p.status, notes: p.notes ?? '', link: p.link ?? '',
+    sort_order: p.sort_order ?? 0, created_at: p.created_at, updated_at: p.updated_at,
+  }));
+  if (dbProjects.length) {
+    const { error } = await supabase.from('projects').upsert(dbProjects);
+    throwIf(error, 'save ideas');
+  }
 
   // Delete cloud orphans (rows the user removed on this device).
   const { data: rc, error: re1 } = await supabase.from('categories').select('id').eq('user_id', userId);
@@ -307,6 +332,15 @@ export async function pushCloud(userId, data) {
     const { error } = await supabase.from('tasks').delete().in('id', delTasks);
     throwIf(error, 'delete to-dos');
   }
+  // Project orphans (linked tasks are unlinked, never deleted, in the UI)
+  const { data: rj, error: re7 } = await supabase.from('projects').select('id').eq('user_id', userId);
+  throwIf(re7, 'check ideas');
+  const keepProjects = new Set((data.projects || []).map((p) => p.id));
+  const delProjects = (rj || []).map((r) => r.id).filter((id) => !keepProjects.has(id));
+  if (delProjects.length) {
+    const { error } = await supabase.from('projects').delete().in('id', delProjects);
+    throwIf(error, 'delete ideas');
+  }
 }
 
 // Make sure a profile row exists for FK references (best-effort; a DB trigger
@@ -322,7 +356,7 @@ export async function upsertProfile(user) {
 const hasContent = (d) =>
   !!d && ((d.categories && d.categories.length > 0) || (d.items && d.items.length > 0) ||
     (d.trackers && d.trackers.length > 0) || (d.tracker_logs && d.tracker_logs.length > 0) ||
-    (d.tasks && d.tasks.length > 0));
+    (d.tasks && d.tasks.length > 0) || (d.projects && d.projects.length > 0));
 
 // Cloud store: same [data, setData] interface as useStore, so the whole UI
 // works unchanged. Pulls on login, pushes (debounced) on every change.
@@ -357,7 +391,7 @@ export function useCloudStore(session, getLocal) {
       setSync({ state: 'loading', at: null, error: '' });
       try {
         const cloud = await pullCloud(userId);
-        const cloudEmpty = cloud.categories.length === 0 && cloud.items.length === 0 && (cloud.trackers || []).length === 0 && (cloud.tasks || []).length === 0;
+        const cloudEmpty = cloud.categories.length === 0 && cloud.items.length === 0 && (cloud.trackers || []).length === 0 && (cloud.tasks || []).length === 0 && (cloud.projects || []).length === 0;
         const local = localRef.current;
         if (cloudEmpty && hasContent(local)) {
           // First login: move this device's entries up to the cloud
@@ -396,6 +430,7 @@ export function useCloudStore(session, getLocal) {
             trackers: defaultTrackers(userId),
             tracker_logs: [],
             tasks: [],
+            projects: defaultProjects(userId),
           };
           await pushCloud(userId, fresh);
           if (!cancelled) {
