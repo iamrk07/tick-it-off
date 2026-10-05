@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { uid, now } from '../lib/store.js';
-import { todayLocal, fmtDay, fmtDateLong, plural } from '../lib/growth.js';
+import { todayLocal, fmtDay, fmtDateLong, fmtDayMon, plural } from '../lib/growth.js';
 
 const shiftDay = (dateStr, dir) => {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -30,6 +30,7 @@ export default function Todo({ data, setData, ttab, setTtab }) {
   const [masterDraft, setMasterDraft] = useState('');
   const [dayDraft, setDayDraft] = useState('');
   const [dismissed, setDismissed] = useState(''); // date for which the overdue nudge was left alone
+  const [showOverdue, setShowOverdue] = useState(false); // expand the unfinished-items list
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({ title: '', notes: '' });
 
@@ -217,8 +218,21 @@ export default function Todo({ data, setData, ttab, setTtab }) {
 
         {day === today && overdue.length > 0 && dismissed !== today && (
           <div className="mt-3 rounded-2xl bg-amber-50 border border-amber-200 p-3">
-            <p className="text-sm font-bold">⏰ {plural(overdue.length, 'unfinished item')} from earlier</p>
-            <p className="text-xs text-slate-500">Carry them into today, or leave them in history as missed.</p>
+            <button onClick={() => setShowOverdue((v) => !v)} className="w-full text-left">
+              <p className="text-sm font-bold">⏰ {plural(overdue.length, 'unfinished item')} from earlier {showOverdue ? '▾' : '▸'}</p>
+              <p className="text-xs text-slate-500">Tap to view the list — carry them into today, or leave them as missed.</p>
+            </button>
+            {showOverdue && (
+              <ul className="mt-2 divide-y divide-amber-100 rounded-xl border border-amber-200 overflow-hidden bg-white">
+                {overdue.map((t) => (
+                  <li key={t.id} className="flex items-center gap-2 px-2.5 py-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">{fmtDayMon(t.scheduled_date)}</span>
+                    <span className="flex-1 min-w-0 text-sm font-semibold truncate" title={t.title}>{t.title}</span>
+                    <button onClick={() => schedule(t.id, today)} className="px-2 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg shrink-0">→ Today</button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="flex gap-2 mt-2 text-xs font-bold">
               <button onClick={moveOverdueToday} className="flex-1 py-2 rounded-xl bg-slate-900 text-white">Move all to today →</button>
               <button onClick={() => setDismissed(today)} className="px-4 py-2 rounded-xl border bg-white">Leave</button>

@@ -70,6 +70,14 @@ export function monthLabel(year, month) {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// Compact day: "5 Oct" (for small chips/badges)
+export function fmtDayMon(v) {
+  if (!v) return '—';
+  const d = asDate(v);
+  if (!d) return String(v);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
 function asDate(v) {
   const d = v instanceof Date ? v : new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
