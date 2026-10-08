@@ -358,8 +358,55 @@ const hasContent = (d) =>
     (d.trackers && d.trackers.length > 0) || (d.tracker_logs && d.tracker_logs.length > 0) ||
     (d.tasks && d.tasks.length > 0) || (d.projects && d.projects.length > 0));
 
+// Merge cloud rows with on-device rows the cloud hasn't seen yet, so an
+// entry can never vanish from a pull (refresh before upload finished, or
+// offline entries present at login). Missing-in-cloud rows are kept only if
+// created after the last successful sync; per id, the newer edit wins.
+function mergeStates(cloud, snaps) {
+  const pick = (key) => {
+    const byId = new Map();
+    (cloud[key] || []).forEach((r) => {
+      if (r && r.id) byId.set(r.id, r);
+    });
+    snaps.forEach(({ data, since }) => {
+      ((data && data[key]) || []).forEach((s) => {
+        if (!s || !s.id) return;
+        const c = byId.get(s.id);
+        const sTime = Date.parse(s.updated_at || s.created_at || '') || 0;
+        if (!c) {
+          const created = Date.parse(s.created_at || '') || 0;
+          if (created > since) byId.set(s.id, s);
+        } else if (sTime > (Date.parse(c.updated_at || c.created_at || '') || 0)) {
+          byId.set(s.id, s);
+        }
+      });
+    });
+    return [...byId.values()];
+  };
+  return {
+    categories: pick('categories'),
+    items: pick('items'),
+    subitems: pick('subitems'),
+    trackers: pick('trackers'),
+    tracker_logs: pick('tracker_logs'),
+    tasks: pick('tasks'),
+    projects: pick('projects'),
+  };
+}
+
+const BACKUP_MAX_AGE = 3 * 24 * 3600 * 1000;
+function readBackup() {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw) return null;
+    return migrate(raw);
+  } catch {
+    return null;
+  }
+}
+
 // Cloud store: same [data, setData] interface as useStore, so the whole UI
-// works unchanged. Pulls on login, pushes (debounced) on every change.
+// works unchanged. Pulls on login, pushes on every change.
 export function useCloudStore(session, getLocal) {
   const userId = session?.user?.id ?? null;
   const snapKey = userId ? `goals-tracker-cloud-${userId}` : null;
@@ -378,6 +425,9 @@ export function useCloudStore(session, getLocal) {
   const readyRef = useRef(false);
   const localRef = useRef(null);
   localRef.current = getLocal;
+  const lastSyncRef = useRef(0);
+  const chainRef = useRef(Promise.resolve());
+  const dataRef = useRef(null);
 
   // Initial pull / first-login migration when the session starts
   useEffect(() => {
@@ -397,20 +447,33 @@ export function useCloudStore(session, getLocal) {
           // First login: move this device's entries up to the cloud
           const normalized = normalizeForCloud(local, userId);
           await pushCloud(userId, normalized);
+          lastSyncRef.current = Date.now();
           if (!cancelled) {
             setDataState({ ...normalized, user: { id: userId, email: session.user.email ?? null, created_at: now() } });
             setSync({ state: 'synced', at: new Date(), error: '' });
           }
         } else if (!cloudEmpty) {
-          // Cloud wins; stash the local copy as a backup just in case
+          // Stash the local copy as a backup just in case, then MERGE:
+          // cloud rows plus any on-device rows the cloud hasn't seen yet,
+          // so entries added offline (or right before a refresh) survive.
           try {
             localStorage.setItem(BACKUP_KEY, JSON.stringify(local));
           } catch { /* ignore */ }
+          let snap = null;
           let settings = local?.settings;
           try {
             const raw = snapKey ? localStorage.getItem(snapKey) : null;
-            if (raw) settings = migrate(raw).settings || settings;
+            if (raw) {
+              snap = migrate(raw);
+              settings = snap.settings || settings;
+            }
           } catch { /* ignore */ }
+          const backup = readBackup();
+          const merged = mergeStates(cloud, [
+            { data: snap, since: lastSyncRef.current },
+            { data: backup, since: Math.max(lastSyncRef.current, Date.now() - BACKUP_MAX_AGE) },
+          ]);
+          lastSyncRef.current = Date.now();
           if (!cancelled) {
             setDataState({
               user: { id: userId, email: session.user.email ?? null, created_at: now() },
@@ -433,6 +496,7 @@ export function useCloudStore(session, getLocal) {
             projects: defaultProjects(userId),
           };
           await pushCloud(userId, fresh);
+          lastSyncRef.current = Date.now();
           if (!cancelled) {
             setDataState(fresh);
             setSync({ state: 'synced', at: new Date(), error: '' });
@@ -451,23 +515,23 @@ export function useCloudStore(session, getLocal) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  // Debounced push on every change (after initial pull)
+  // Immediate, serialized push on every change (no debounce gap to lose data in)
   useEffect(() => {
     if (!userId || !readyRef.current || !data) return;
     try {
       if (snapKey) localStorage.setItem(snapKey, JSON.stringify(data));
     } catch { /* ignore */ }
-    setSync((s) => (s.state === 'synced' ? { ...s, state: 'pending' } : s));
-    const t = setTimeout(async () => {
+    setSync((s) => ({ ...s, state: 'syncing', error: '' }));
+    const run = async () => {
       try {
-        setSync((s) => ({ ...s, state: 'syncing' }));
         await pushCloud(userId, data);
+        lastSyncRef.current = Date.now();
         setSync({ state: 'synced', at: new Date(), error: '' });
       } catch (err) {
         setSync({ state: 'error', at: null, error: err.message || 'Sync failed' });
       }
-    }, 700);
-    return () => clearTimeout(t);
+    };
+    chainRef.current = chainRef.current.then(run, run);
   }, [data, userId, snapKey]);
 
   const setData = (updater) =>
@@ -478,16 +542,20 @@ export function useCloudStore(session, getLocal) {
     setSync({ state: 'loading', at: null, error: '' });
     try {
       const cloud = await pullCloud(userId);
+      const merged = mergeStates(cloud, [{ data: dataRef.current, since: lastSyncRef.current }]);
+      lastSyncRef.current = Date.now();
       setDataState((prev) => ({
         user: { id: userId, email: session.user.email ?? null, created_at: now() },
         settings: prev?.settings || { appTitle: 'Tick It Off ✅', tagline: '' },
-        ...cloud,
+        ...merged,
       }));
       setSync({ state: 'synced', at: new Date(), error: '' });
     } catch (err) {
       setSync({ state: 'error', at: null, error: err.message || 'Refresh failed' });
     }
   };
+
+  dataRef.current = data;
 
   return [data, setData, { sync, refresh }];
 }

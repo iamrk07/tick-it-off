@@ -113,7 +113,11 @@ export default function AuthArea({ session, sync, onRefresh }) {
       </span>
       <button onClick={onRefresh} title="Reload from cloud" className="px-2 py-1.5 rounded-xl bg-white/15 border border-white/30 font-bold">↻</button>
       <button onClick={logout} title="Log out" className="px-2 py-1.5 rounded-xl bg-white/15 border border-white/30 font-bold">⏻</button>
-      <span className="text-white/80 font-semibold hidden md:inline whitespace-nowrap">{syncText(sync)}</span>
+      {sync.state === 'error' ? (
+        <span className="text-red-200 font-bold whitespace-nowrap">Sync failed — tap ↻</span>
+      ) : (
+        <span className="text-white/80 font-semibold hidden md:inline whitespace-nowrap">{syncText(sync)}</span>
+      )}
     </div>
   );
 }
