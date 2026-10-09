@@ -431,8 +431,9 @@ export function scanLocalCopies() {
 
 // Recovery: fold every found copy into the current state. Rows missing from
 // the current state come back (if created within 30 days); per id, the newer
-// edit wins. Returns { data, added, sources } for the summary message.
-export function recoverInto(current) {
+// edit wins. userId (when known) is stamped onto recovered rows so a later
+// cloud upload can't fail ownership checks.
+export function recoverInto(current, userId) {
   const copies = scanLocalCopies();
   const since = Date.now() - 30 * 24 * 3600 * 1000;
   const base = {
@@ -452,7 +453,10 @@ export function recoverInto(current) {
   Object.keys(base).forEach((k) => {
     const before = new Set(base[k].map((r) => r && r.id));
     merged[k].forEach((r) => {
-      if (r && r.id && !before.has(r.id)) added++;
+      if (r && r.id && !before.has(r.id)) {
+        added++;
+        if (userId && 'user_id' in r) r.user_id = userId;
+      }
     });
   });
   return {
@@ -577,6 +581,9 @@ export function useCloudStore(session, getLocal) {
     if (!userId || !readyRef.current || !data) return;
     try {
       if (snapKey) localStorage.setItem(snapKey, JSON.stringify(data));
+      // Second durable copy in the plain offline lane: logout still shows
+      // fresh data, and no single key is a single point of failure.
+      localStorage.setItem(KEY, JSON.stringify(data));
     } catch { /* ignore */ }
     setSync((s) => ({ ...s, state: 'syncing', error: '' }));
     const run = async () => {

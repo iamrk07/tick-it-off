@@ -189,7 +189,7 @@ export default function App() {
   const doRecover = () => {
     let res;
     try {
-      res = recoverInto(data);
+      res = recoverInto(data, session?.user?.id ?? null);
     } catch {
       alert('Recovery failed to read this browser storage.');
       return;
