@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useStore, useCloudStore, uid, now, LOCAL_USER_ID } from './lib/store.js';
+import { useStore, useCloudStore, uid, now, LOCAL_USER_ID, recoverInto } from './lib/store.js';
 import { supabase } from './lib/supabase.js';
 import AuthArea from './components/Auth.jsx';
 import Growth from './components/Growth.jsx';
@@ -183,6 +183,23 @@ export default function App() {
     setQuery('');
     setStatusFilter('active');
     go({ view: 'home', mobileTab: 'items', ttab: 'today', itab: 'projects', gtab: 'trackers', selectedCat: 'all', selectedItemId: null, modal: false }, { replace: true });
+  };
+
+  // Recovery: fold every on-device copy (offline data, snapshots, backup) back in
+  const doRecover = () => {
+    let res;
+    try {
+      res = recoverInto(data);
+    } catch {
+      alert('Recovery failed to read this browser storage.');
+      return;
+    }
+    if (res.added === 0) {
+      alert('Scanned this browser — no lost entries found here. If you added them on another device or browser, open this link there (and log in) instead.');
+      return;
+    }
+    setData(res.data);
+    alert(`Recovered ${res.added} ${res.added === 1 ? 'row' : 'rows'} from ${res.sources} ${res.sources === 1 ? 'place' : 'places'} on this device. Please review — delete anything unexpected.`);
   };
 
   // ---------- category actions ----------
@@ -439,6 +456,7 @@ export default function App() {
                 <div className="absolute right-0 mt-1 w-48 card p-1.5 text-slate-900 text-xs font-bold z-30">
                   <button onClick={() => toJSON(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Download JSON</button>
                   <button onClick={() => toCSV(data)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Download CSV</button>
+                  <button onClick={doRecover} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Recover lost entries</button>
                   {session && <button onClick={() => cloudMeta.refresh()} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">↻ Reload from cloud</button>}
                 </div>
               </details>

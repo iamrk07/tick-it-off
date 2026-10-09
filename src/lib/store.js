@@ -405,6 +405,63 @@ function readBackup() {
   }
 }
 
+// Recovery: list every data copy this browser holds (offline data,
+// per-account cloud snapshots, safety backup) with row counts.
+export function scanLocalCopies() {
+  const found = [];
+  const take = (label, raw) => {
+    if (!raw) return;
+    try {
+      const d = migrate(raw);
+      const n = ['categories', 'items', 'subitems', 'trackers', 'tracker_logs', 'tasks', 'projects']
+        .reduce((s, k) => s + ((d[k] || []).length), 0);
+      found.push({ label, count: n, data: d });
+    } catch { /* ignore corrupt snapshots */ }
+  };
+  try {
+    take('offline data on this device', localStorage.getItem(KEY));
+    take('safety backup', localStorage.getItem(BACKUP_KEY));
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('goals-tracker-cloud-')) take('synced snapshot', localStorage.getItem(k));
+    }
+  } catch { /* storage unavailable */ }
+  return found;
+}
+
+// Recovery: fold every found copy into the current state. Rows missing from
+// the current state come back (if created within 30 days); per id, the newer
+// edit wins. Returns { data, added, sources } for the summary message.
+export function recoverInto(current) {
+  const copies = scanLocalCopies();
+  const since = Date.now() - 30 * 24 * 3600 * 1000;
+  const base = {
+    categories: current.categories || [],
+    items: current.items || [],
+    subitems: current.subitems || [],
+    trackers: current.trackers || [],
+    tracker_logs: current.tracker_logs || [],
+    tasks: current.tasks || [],
+    projects: current.projects || [],
+  };
+  const merged = mergeStates(
+    base,
+    copies.map((c) => ({ data: c.data, since }))
+  );
+  let added = 0;
+  Object.keys(base).forEach((k) => {
+    const before = new Set(base[k].map((r) => r && r.id));
+    merged[k].forEach((r) => {
+      if (r && r.id && !before.has(r.id)) added++;
+    });
+  });
+  return {
+    data: { ...current, ...merged },
+    added,
+    sources: copies.filter((c) => c.count > 0).length,
+  };
+}
+
 // Cloud store: same [data, setData] interface as useStore, so the whole UI
 // works unchanged. Pulls on login, pushes on every change.
 export function useCloudStore(session, getLocal) {
