@@ -114,7 +114,9 @@ export default function AuthArea({ session, sync, onRefresh }) {
       <button onClick={onRefresh} title="Reload from cloud" className="px-2 py-1.5 rounded-xl bg-white/15 border border-white/30 font-bold">↻</button>
       <button onClick={logout} title="Log out" className="px-2 py-1.5 rounded-xl bg-white/15 border border-white/30 font-bold">⏻</button>
       {sync.state === 'error' ? (
-        <span className="text-red-200 font-bold whitespace-nowrap">Sync failed — tap ↻</span>
+        <button onClick={() => alert(`Sync failed:\n\n${sync.error || 'unknown error'}\n\nSend these exact words for a fix. Tap reload to retry.`)} className="text-red-200 font-bold whitespace-nowrap underline" title="Tap to see the full error">
+          Sync failed — tap for details
+        </button>
       ) : (
         <span className="text-white/80 font-semibold hidden md:inline whitespace-nowrap">{syncText(sync)}</span>
       )}

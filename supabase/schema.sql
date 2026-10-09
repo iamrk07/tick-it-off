@@ -41,6 +41,28 @@ create table if not exists checklist_subitems (
 );
 
 -- Row Level Security: each user sees only their own rows (private-per-person MVP)
+-- (If Supabase enabled RLS on users via the dashboard prompt, this keeps it consistent.)
+alter table users enable row level security;
+drop policy if exists "own profile" on users;
+create policy "own profile" on users
+  for all using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Auto-create a profile row whenever someone signs up (needed for login sync)
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.users (id, email)
+  values (new.id, new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 alter table categories enable row level security;
 alter table items enable row level security;
 alter table checklist_subitems enable row level security;
