@@ -153,6 +153,7 @@ export default function App() {
   const todayStr = fmtDay(new Date());
   const todoTodayOpen = (data.tasks || []).filter((t) => t.scheduled_date === todayStr && t.status === 'active').length;
   const todoMaster = (data.tasks || []).filter((t) => !t.scheduled_date && t.status === 'active').length;
+  const todoOverdue = (data.tasks || []).filter((t) => t.status === 'active' && t.scheduled_date && t.scheduled_date < todayStr).length;
   const ideasActive = (data.projects || []).filter((p) => p.status === 'active').length;
 
   // Best day-streak across all growth trackers (for the home card)
@@ -439,6 +440,7 @@ export default function App() {
                   <>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{todoTodayOpen} today</span>
                     <span className="bg-white/15 rounded-full px-2.5 py-0.5 whitespace-nowrap">{todoMaster} master</span>
+                    {todoOverdue > 0 && <span className="bg-red-500 rounded-full px-2.5 py-0.5 whitespace-nowrap">{todoOverdue} overdue</span>}
                   </>
                 )}
                 {view === 'ideas' && (
@@ -493,6 +495,7 @@ export default function App() {
           <div className="flex gap-2 mt-6 text-xs font-bold flex-wrap">
             <span className="bg-white/20 rounded-full px-3 py-1">{todoTodayOpen} today</span>
             <span className="bg-white/20 rounded-full px-3 py-1">{todoMaster} master</span>
+            {todoOverdue > 0 && <span className="bg-red-500 rounded-full px-3 py-1">{todoOverdue} overdue</span>}
             <span className="bg-white text-slate-900 rounded-full px-3 py-1 ml-auto">Open →</span>
           </div>
         </button>

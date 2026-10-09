@@ -38,12 +38,34 @@ const weekdayLong = (dateStr) => {
   }
 };
 
+// "14:30" -> "2:30 PM" for chips and reminders
+const fmtTime = (hhmm) => {
+  if (!hhmm) return '';
+  const [h, m] = String(hhmm).split(':').map(Number);
+  if (Number.isNaN(h)) return String(hhmm);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m ?? 0).padStart(2, '0')} ${ap}`;
+};
+
+const nowHM = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 // To-Do: Master backlog (unscheduled) + day view + 30-day history.
 // Props: data, setData, ttab/setTtab (mobile panes), day/setDay, period/setPeriod, openDay (all routed through app history for back-button support)
 export default function Todo({ data, setData, ttab, setTtab, day, setDay, period, setPeriod, openDay }) {
   const me = data.user?.id ?? 'local-user';
   const tasks = data.tasks || [];
   const today = todayLocal();
+  const hm = nowHM(); // current time, for due chips (refreshes each render)
+  const [notifyOn, setNotifyOn] = useState(() => {
+    try {
+      return typeof Notification !== 'undefined' && localStorage.getItem('tickoff-notify') === '1';
+    } catch {
+      return false;
+    }
+  });
 
   const [histDay, setHistDay] = useState(today);
   const [masterDraft, setMasterDraft] = useState('');
@@ -56,7 +78,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
     return { y: d.getFullYear(), m: d.getMonth() };
   });
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ title: '', notes: '', repeat: 'none', project: '' });
+  const [editDraft, setEditDraft] = useState({ title: '', notes: '', repeat: 'none', project: '', due: '' });
   const projById = useMemo(() => Object.fromEntries((data.projects || []).map((p) => [p.id, p])), [data.projects]);
 
   const master = useMemo(
@@ -87,6 +109,65 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
     () => tasks.filter((t) => t.scheduled_date === histDay).sort(byCreated),
     [tasks, histDay]
   );
+
+  // Due now: open tasks whose date has arrived and whose time has passed
+  const dueNowList = useMemo(
+    () => tasks
+      .filter((t) => t.status === 'active' && t.scheduled_date && t.scheduled_date <= today && t.due_time && t.due_time <= hm)
+      .sort(byCreated),
+    [tasks, today, hm]
+  );
+
+  // Browser reminders while the app is open (opt-in, checked every 30s)
+  useEffect(() => {
+    if (!notifyOn || typeof Notification === 'undefined') return;
+    const check = () => {
+      if (Notification.permission !== 'granted') return;
+      const d = new Date();
+      const cur = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const dayS = todayLocal();
+      let seen = [];
+      try {
+        seen = JSON.parse(localStorage.getItem(`tickoff-notified-${dayS}`) || '[]');
+      } catch {
+        seen = [];
+      }
+      const due = tasks.filter((t) => t.status === 'active' && t.scheduled_date && t.scheduled_date <= dayS && t.due_time && t.due_time <= cur && !seen.includes(t.id));
+      if (!due.length) return;
+      try {
+        new Notification(due.length === 1 ? `Due now: ${due[0].title}` : `${due.length} tasks due now`, {
+          body: due.length === 1 ? due[0].notes || 'Time to do it.' : due.slice(0, 3).map((t) => `• ${t.title}`).join('\n'),
+        });
+      } catch { /* ignore */ }
+      try {
+        localStorage.setItem(`tickoff-notified-${dayS}`, JSON.stringify([...seen, ...due.map((t) => t.id)]));
+      } catch { /* ignore */ }
+    };
+    check();
+    const iv = setInterval(check, 30000);
+    return () => clearInterval(iv);
+  }, [notifyOn, tasks]);
+
+  const toggleReminders = async () => {
+    if (notifyOn) {
+      try {
+        localStorage.setItem('tickoff-notify', '0');
+      } catch { /* ignore */ }
+      setNotifyOn(false);
+      return;
+    }
+    if (typeof Notification === 'undefined') return alert('This browser does not support notifications.');
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return alert('Notifications are blocked — allow them in the browser site settings first.');
+    } catch {
+      return alert('Could not enable notifications in this browser.');
+    }
+    try {
+      localStorage.setItem('tickoff-notify', '1');
+    } catch { /* ignore */ }
+    setNotifyOn(true);
+  };
 
   // Week view: Monday–Sunday of the viewed week
   const weekMonday = shiftDay(mondayStr(), weekOff * 7);
@@ -194,7 +275,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
 
   const startEdit = (t) => {
     setEditingId(t.id);
-    setEditDraft({ title: t.title, notes: t.notes ?? '', repeat: t.repeat ?? 'none', project: t.project_id ?? '' });
+    setEditDraft({ title: t.title, notes: t.notes ?? '', repeat: t.repeat ?? 'none', project: t.project_id ?? '', due: t.due_time ?? '' });
   };
 
   const saveEdit = () => {
@@ -202,7 +283,7 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
     setData((d) => ({
       ...d,
       tasks: d.tasks.map((x) => (x.id === editingId
-        ? { ...x, title: editDraft.title.trim(), notes: editDraft.notes, repeat: editDraft.repeat ?? 'none', project_id: editDraft.project || null, updated_at: now() }
+        ? { ...x, title: editDraft.title.trim(), notes: editDraft.notes, repeat: editDraft.repeat ?? 'none', project_id: editDraft.project || null, due_time: editDraft.due || null, updated_at: now() }
         : x)),
     }));
     setEditingId(null);
@@ -213,12 +294,15 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
       <input value={editDraft.title} onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} className="input !py-1.5 !text-sm font-semibold" autoFocus />
       <input value={editDraft.notes} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && saveEdit()} placeholder="Note (optional)…" className="input !py-1.5 !text-xs" />
       <div className="flex gap-1.5">
+        <input value={editDraft.due} onChange={(e) => setEditDraft({ ...editDraft, due: e.target.value })} type="time" aria-label="due time" title="Due time (optional)" className="input !py-1.5 !text-xs flex-1" />
         <select value={editDraft.repeat} onChange={(e) => setEditDraft({ ...editDraft, repeat: e.target.value })} className="input !py-1.5 !text-xs flex-1" aria-label="repeat">
           <option value="none">Does not repeat</option>
           <option value="daily">Repeats daily</option>
           <option value="weekly">Repeats weekly</option>
           <option value="monthly">Repeats monthly</option>
         </select>
+      </div>
+      <div className="flex gap-1.5">
         <select value={editDraft.project} onChange={(e) => setEditDraft({ ...editDraft, project: e.target.value })} className="input !py-1.5 !text-xs flex-1" aria-label="venture">
           <option value="">No venture</option>
           {(data.projects || []).map((p) => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
@@ -248,6 +332,11 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
           <p className={`font-semibold text-[15px] leading-snug ${t.status === 'done' ? 'line-through' : ''}`}>
             {t.title}
             {t.repeat && t.repeat !== 'none' && <span className="ml-1.5 text-[10px] font-bold text-violet-700 bg-violet-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">↻ {t.repeat}</span>}
+            {t.due_time && (
+              <span className={`ml-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5 whitespace-nowrap ${t.status === 'active' && t.scheduled_date && t.scheduled_date <= today && t.due_time <= hm ? 'text-red-700 bg-red-100' : 'text-slate-600 bg-slate-100'}`}>
+                {fmtTime(t.due_time)}
+              </span>
+            )}
             {t.project_id && projById[t.project_id] && <span className="ml-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5 whitespace-nowrap text-white" style={{ background: projById[t.project_id].color }}>{projById[t.project_id].icon} {projById[t.project_id].name}</span>}
           </p>
           {t.notes && <p className="text-xs text-slate-500 truncate">{t.notes}</p>}
@@ -315,6 +404,9 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
             <button onClick={() => setDay(shiftDay(day, 1))} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold" aria-label="next day">›</button>
           </div>
           <div className="flex gap-1.5">
+            <button onClick={toggleReminders} title={notifyOn ? 'Reminders on — tap to turn off' : 'Get a reminder when tasks come due (while the app is open)'} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${notifyOn ? 'bg-emerald-500 text-white' : 'bg-slate-100'}`}>
+              {notifyOn ? 'Reminders on' : 'Reminders off'}
+            </button>
             {day !== today && (
               <button onClick={() => setDay(today)} className="px-3 py-1.5 rounded-xl bg-slate-100 text-xs font-bold">Today</button>
             )}
@@ -343,6 +435,15 @@ export default function Todo({ data, setData, ttab, setTtab, day, setDay, period
               <button onClick={moveOverdueToday} className="flex-1 py-2 rounded-xl bg-slate-900 text-white">Move all to today →</button>
               <button onClick={() => setDismissed(today)} className="px-4 py-2 rounded-xl border bg-white">Leave</button>
             </div>
+          </div>
+        )}
+
+        {dueNowList.length > 0 && (
+          <div className="mt-3 rounded-2xl bg-red-50 border border-red-200 p-3">
+            <p className="text-sm font-bold text-red-700">Due now · {plural(dueNowList.length, 'task')}</p>
+            <ul className="mt-1.5 divide-y divide-red-100 rounded-xl border border-red-200 overflow-hidden bg-white">
+              {dueNowList.map((t) => taskRow(t, {}))}
+            </ul>
           </div>
         )}
 

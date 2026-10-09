@@ -156,6 +156,7 @@ create table if not exists tasks (
   repeat text default 'none',
   project_id uuid,
   series_id uuid,
+  due_time text,
   status text default 'active' check (status in ('active', 'done')),
   sort_order int default 0,
   created_at timestamptz default now(),
@@ -174,6 +175,9 @@ grant all on public.tasks to authenticated;
 
 -- Repeating-series linkage (for DBs created before series_id existed)
 alter table tasks add column if not exists series_id uuid;
+
+-- Due times for reminders (Phase D)
+alter table tasks add column if not exists due_time text;
 
 -- Ideas / Ventures: projects & businesses with a status pipeline.
 -- tasks.project_id links to-dos to a venture (plain uuid, no FK: links survive project deletes).
