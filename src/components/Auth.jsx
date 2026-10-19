@@ -17,7 +17,7 @@ function syncText(sync) {
 // Props: session, sync (from useCloudStore), onRefresh
 export default function AuthArea({ session, sync, onRefresh }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState('signin'); // signin | signup
+  const [mode, setMode] = useState('signin'); // signin | signup | forgot
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [msg, setMsg] = useState('');
@@ -35,7 +35,7 @@ export default function AuthArea({ session, sync, onRefresh }) {
         setOpen(false);
         setEmail('');
         setPw('');
-      } else {
+      } else if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: pw });
         if (error) throw error;
         if (data.session) {
@@ -45,6 +45,15 @@ export default function AuthArea({ session, sync, onRefresh }) {
         } else {
           setMsg('Account created! Check your inbox to confirm, then log in. (Or ask to turn off email confirmation.)');
         }
+      } else if (mode === 'forgot') {
+        if (!email.trim()) return setMsg('Enter your email.');
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+        setMsg('Reset link sent — check your inbox (or spam). Link opens in this app.');
+        setMode('signin');
+        setPw('');
       }
     } catch (err) {
       setMsg(err.message || 'Something went wrong.');
@@ -81,19 +90,21 @@ export default function AuthArea({ session, sync, onRefresh }) {
                   : 'One account = your private space on every device.'}
               </p>
               <div className="flex gap-1.5 mt-3 text-xs font-bold">
-                {(['signin', 'signup']).map((m) => (
+                {(['signin', 'signup', 'forgot']).map((m) => (
                   <button key={m} onClick={() => { setMode(m); setMsg(''); }}
                     className={`flex-1 py-2 rounded-xl ${mode === m ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    {m === 'signin' ? 'Log in' : 'Sign up'}
+                    {m === 'signin' ? 'Log in' : m === 'signup' ? 'Sign up' : 'Forgot password'}
                   </button>
                 ))}
               </div>
               <div className="grid gap-2 mt-3">
                 <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" inputMode="email" autoComplete="email" className="input" />
-                <input value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="Password (min 6 characters)" type="password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="input" />
+                {(mode !== 'forgot') && (
+                  <input value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="Password (min 6 characters)" type="password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="input" />
+                )}
                 {msg && <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">{msg}</p>}
                 <button onClick={submit} disabled={busy} className="btn-primary py-2.5 text-sm disabled:opacity-60">
-                  {busy ? 'Please wait…' : mode === 'signin' ? 'Log in' : 'Create account'}
+                  {busy ? 'Please wait…' : mode === 'signin' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
                 </button>
                 <p className="text-[11px] text-slate-400 text-center">Logged out = private data on this device only.</p>
               </div>
