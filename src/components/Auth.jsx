@@ -24,8 +24,9 @@ export default function AuthArea({ session, sync, onRefresh }) {
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!email.trim() || !pw) return setMsg('Enter email and password.');
-    if (pw.length < 6) return setMsg('Password needs at least 6 characters.');
+    if (!email.trim()) return setMsg(mode === 'forgot' ? 'Enter your email.' : 'Enter email and password.');
+    if (mode !== 'forgot' && !pw) return setMsg('Enter email and password.');
+    if (mode !== 'forgot' && pw.length < 6) return setMsg('Password needs at least 6 characters.');
     setBusy(true);
     setMsg('');
     try {
@@ -81,13 +82,15 @@ export default function AuthArea({ session, sync, onRefresh }) {
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/55 backdrop-blur-sm p-0 sm:p-4" onClick={() => setOpen(false)}>
             <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 text-slate-900" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between">
-                <h2 className="font-display font-bold text-xl">{mode === 'signin' ? 'Welcome back' : 'Create account'}</h2>
+                <h2 className="font-display font-bold text-xl">{mode === 'signin' ? 'Welcome back' : mode === 'forgot' ? 'Reset password' : 'Create account'}</h2>
                 <button onClick={() => setOpen(false)} aria-label="close" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 font-bold">✕</button>
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {mode === 'signin'
                   ? 'Log in to sync your entries across phone & laptop.'
-                  : 'One account = your private space on every device.'}
+                  : mode === 'forgot'
+                    ? 'We send a link that opens here to set a new password.'
+                    : 'One account = your private space on every device.'}
               </p>
               <div className="flex gap-1.5 mt-3 text-xs font-bold">
                 {(['signin', 'signup', 'forgot']).map((m) => (
